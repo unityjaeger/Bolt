@@ -120,6 +120,8 @@ bolt.gjk.shapecast_simple(start: CFrame, direction: Vector3, tolerance: number, 
 ```
 The second return value is the distance.
 
+If the distance is 0, the shapecast started with the 2 shapes already overlapping.
+
 ```lua
 bolt.gjk.shapecast(start: CFrame, direction: Vector3, tolerance: number, convex_radius_a: number, shape_a: Shape, convex_radius_b: number, shape_b: Shape): (Vector3?, number?, Vector3?)
 ```
@@ -134,3 +136,8 @@ bolt.gjk.shapecast(start: CFrame, direction: Vector3, tolerance: number, convex_
 convex_radius_a and convex_radius_b are used to pad shape_a and shape_b, this leads to improved numerical robustness and performance, however the larger the convex radii the larger the rounding on the shape, which is mostly noticable around corners and edges.
 
 A sensible default for the convex radii would depend on the size of the shape, but something like 0.05 works well in practice.
+
+Once again, if the distance is 0, the shapecast started with the 2 shapes already overlapping, in this case the normal will have a garbage direction that you should ignore, and the hit point will be a point inside of shape_a.
+
+> [!CAUTION]
+> The normal around edges/corners can be different from what you would expect (e.g. not orthonogonal to a box face) due to the convex radii, even with a summed convex radius of 0, this will still happen because of the way gjk works.
