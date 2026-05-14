@@ -1,5 +1,7 @@
 # Bolt
 
+Collision library for simple intersection tests, does not deliver contact information for collisions.
+
 ## Features
 Fully cross-supported primitive shapes: boxes, spheres, capsules and rays each have special-cased implementations for every pairing (box-box, box-sphere, box-ray, sphere-sphere, etc.).
 
@@ -11,7 +13,7 @@ GJK also offers raycasting as well as shapecasting, although there are some cave
 The library functions all operate on a cframe (for consistency) and a shape table for a given object, the shape table holds information like radius for spheres, half extents for boxes, etc.
 
 There are functions for every supported shape, as well as a function for getting the shape table from a BasePart.
-> [!NOTE]
+> [!WARNING]
 > capsules and cylinders in bolt use the same alignment as cylinders in roblox, so cframe.RightVector is the axis, while size.X is the height and size.Y/2 is the radius
 ```lua
 bolt.create_from_part(part: BasePart): Shape
@@ -39,7 +41,7 @@ bolt.create_mesh(part: MeshPart): MeshShape
 ```
 
 ## Collision Functions
-special-cased:
+### special-cased
 ```lua
 bolt.collision.box_box(box_a_cf: CFrame, box_a_shape: BoxShape, box_b_cf: CFrame, box_b_Shape: BoxShape): boolean
 ```
@@ -56,24 +58,32 @@ bolt.collision.sphere_sphere(sphere_a_cf: CFrame, sphere_a_shape: SphereShape, s
 bolt.collision.sphere_capsule(sphere_cf: CFrame, sphere_shape: SphereShape, capsule_cf: CFrame, capsule_shape: CapsuleShape): boolean
 ```
 ```lua
-bolt.collision.capsule_capsule(capsule_a_cf: CFrame, capsule_a_shape: SphereShape, capsule_b_cf: CFrame, capsule_b_shape: CapsuleShape): boolean
+bolt.collision.capsule_capsule(capsule_a_cf: CFrame, capsule_a_shape: CapsuleShape, capsule_b_cf: CFrame, capsule_b_shape: CapsuleShape): boolean
 ```
 
-gjk:
+### GJK
+All combinations not covered by the above special-cased functions will have to be done through gjk.
+
 ```lua
-bolt.gjk.intersects(transform_b_in_a: CFrame, shape_a: types.Shape, shape_b: types.Shape, in_tolerance: number, io_v: Vector3): (boolean, Vector3)
+bolt.gjk.intersects(transform_b_in_a: CFrame, shape_a: types.Shape, shape_b: types.Shape, in_tolerance: number): boolean
 ```
 
-## Raycasting/Shapecasting
-special-cased:
+The gjk collision function does not follow the same scheme as the special-cased collision functions, this is because the support function works in object space for higher performance.
 
-first return value: hit point
+Additionally we have in_tolerance, which is the minimum distance between the two objects before they count as colliding, typically this is a small number, something like 1e-5, but if accuraccy doesn't matter as much you can increase it for higher performance.
 
-second return value: distance
+> [!IMPORTANT]
+> transform_b_in_a can be calculated like so:
+> ```lua
+> local transform_b_in_a = cf_a:Inverse() * cf_b
+> ```
 
-third return value: normal
+## Raycasting
+### special-cased
+The first return value is the hit point, the second return value is the distance, the third return value is the hit normal, and the fourth return value dictates whether or not the hit comes from inside the shape itself.
 
-fourth return value: inside or not
+When the hit comes from inside the shape, the normal will point inwards.
+
 ```lua
 bolt.raycast.box(ray_origin: Vector3, ray_direction: Vector3, box_cf: CFrame, box_shape: BoxShape): (Vector3?, number?, Vector3?, boolean?)
 ```
@@ -84,5 +94,30 @@ bolt.raycast.sphere(ray_origin: Vector3, ray_direction: Vector3, sphere_cf: CFra
 bolt.raycast.capsule(ray_origin: Vector3, ray_direction: Vector3, capsule_cf: CFrame, capsule_shape: CapsuleShape): (Vector3?, number?, Vector3?, boolean?)
 ```
 
-gjk:
-placeholder
+### GJK
+Shapes not supported above will have to be done through gjk.
+
+```lua
+bolt.gjk.raycast(ray_origin: Vector3, ray_direction: Vector3, tolerance: number, shape: Shape): (Vector3?, number?, Vector3?)
+```
+
+The raycasting function for gjk functions a bit different from the special-cased one when it comes to rays that start inside of the shape.
+
+When the ray starts inside of the shape, the distance will be 0, the hit normal will have a length of 0 and the hit point will be the ray origin itself, so if you want to check if a ray started inside of a shape, just check if the distance is equal to 0.
+
+> [!Important]
+> ray_origin and ray_direction also need to be in the object space of whatever you are casting against, so they are calculated like so:
+> ```lua
+> ray_origin = shape_cf:PointToObjectSpace(ray_origin)
+> ray_direction = shape_cf:VectorToOjbectSpace(ray_direction)
+> ```
+
+## Shapecasting
+Shapecasting is only supported through gjk, there are 2 functions for shapecasting, one does not deliver any hit information and runs faster.
+
+```lua
+bolt.gjk.shapecast_simple(start: CFrame, direction: Vector3, tolerance: number, shape_a: Shape, shape_b: Shape): boolean
+```
+```lua
+bolt.gjk.shapecast(start: CFrame, direction: Vector3, tolerance: number, convex_radius_a: number, shape_a: Shape, convex_radius_b: number, shape_b: Shape): (Vector3?, number?, Vector3?)
+```
