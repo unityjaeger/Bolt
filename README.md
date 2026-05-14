@@ -70,7 +70,7 @@ bolt.gjk.intersects(transform_b_in_a: CFrame, shape_a: types.Shape, shape_b: typ
 
 The gjk collision function does not follow the same scheme as the special-cased collision functions, this is because the support function works in object space for higher performance.
 
-Additionally we have in_tolerance, which is the minimum distance between the two objects before they count as colliding, typically this is a small number, something like 1e-5, but if accuraccy doesn't matter as much you can increase it for higher performance.
+Additionally we have in_tolerance, which is the minimum distance between the two objects before they count as colliding, typically this is a small number, something like 0.01, but if accuraccy doesn't matter as much you can increase it for higher performance.
 
 > [!IMPORTANT]
 > transform_b_in_a can be calculated like so:
