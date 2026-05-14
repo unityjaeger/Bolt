@@ -116,8 +116,21 @@ When the ray starts inside of the shape, the distance will be 0, the hit normal 
 Shapecasting is only supported through gjk, there are 2 functions for shapecasting, one does not deliver any hit information and runs faster.
 
 ```lua
-bolt.gjk.shapecast_simple(start: CFrame, direction: Vector3, tolerance: number, shape_a: Shape, shape_b: Shape): boolean
+bolt.gjk.shapecast_simple(start: CFrame, direction: Vector3, tolerance: number, shape_a: Shape, shape_b: Shape): (boolean, number?)
 ```
+The second return value is the distance.
+
 ```lua
 bolt.gjk.shapecast(start: CFrame, direction: Vector3, tolerance: number, convex_radius_a: number, shape_a: Shape, convex_radius_b: number, shape_b: Shape): (Vector3?, number?, Vector3?)
 ```
+> [!IMPORTANT]
+> start and direction need to be in the object space of shape_b, you can calculate them like so:
+> ```lua
+> --assuming start is the cframe of shape_a
+> start = cframe_b:ToObjectSpace(start)
+> direction = cframe_b:VectorToObjectSpace(direction)
+> ```
+
+convex_radius_a and convex_radius_b are used to pad shape_a and shape_b, this leads to improved numerical robustness and performance, however the larger the convex radii the larger the rounding on the shape, which is mostly noticable around corners and edges.
+
+A sensible default for the convex radii would depend on the size of the shape, but something like 0.05 works well in practice.
