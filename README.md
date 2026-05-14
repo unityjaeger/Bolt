@@ -14,7 +14,7 @@ The library functions all operate on a cframe (for consistency) and a shape tabl
 
 There are functions for every supported shape, as well as a function for getting the shape table from a BasePart.
 > [!IMPORTANT]
-> capsules and cylinders in bolt use the same alignment as cylinders in roblox, so cframe.RightVector is the axis, while size.X is the height and size.Y/2 is the radius
+> capsules and cylinders in Bolt use the same alignment as cylinders in roblox, so cframe.RightVector is the axis, while size.X is the height and size.Y/2 is the radius
 ```lua
 bolt.create_from_part(part: BasePart): Shape
 ```
@@ -145,7 +145,7 @@ bolt.gjk.shapecast(start: CFrame, direction: Vector3, in_tolerance: number, conv
 ```
 
 For both functions, when the distance is 0, the shapes started out already overlapping.
-For shapecast specifically, when the distance is 0, the nromal will haev an unuseable directon that you should ignore, and the hit point will be a point inside of shape_a.
+For shapecast specifically, when the distance is 0, the normal will have an unuseable directon that you should ignore, and the hit point will be a point inside of shape_a.
 
 convex_radius_a and convex_radius_b are used to pad shape_a and shape_b, this leads to improved numerical robustness and performance, however the larger the convex radii the larger the rounding on the shape, which is mostly noticable around corners and edges.
 
