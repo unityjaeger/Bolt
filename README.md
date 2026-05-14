@@ -7,7 +7,7 @@ Fully cross-supported primitive shapes: boxes, spheres, capsules and rays each h
 
 For unsupported shape combinations, GJK (ported from [Jolt](https://github.com/jrouwe/JoltPhysics)) covers all other combinations, with native support functions for boxes, spheres, capsules, cylinders, wedges, corner wedges and convex meshes.
 
-GJK also offers raycasting as well as shapecasting, although there are some caveats in regards to the returned cast information that will be mentioned later.
+GJK also offers raycasting as well as shapecasting, although there are some pitfalls to watch out for that will be mentioned where relevant.
 
 ## Getting Started
 The library functions all operate on a cframe (for consistency) and a shape table for a given object, the shape table holds information like radius for spheres, half extents for boxes, etc.
