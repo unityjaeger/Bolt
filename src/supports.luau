@@ -33,8 +33,13 @@ local function capsule(shape: types.CapsuleShape, direction: Vector3): Vector3
 
 	local proj = vector.dot(direction :: any, V_X :: any)
 	local pole_offset = (proj >= 0 and half_height or -half_height) * V_X
-
-	return pole_offset + shape.radius * direction
+	
+	local mag = vector.magnitude(direction :: any)
+	if mag < FLT_EPSILON then
+		return pole_offset
+	end
+	
+	return pole_offset + shape.radius * direction / mag
 end
 
 local function cylinder(shape: types.CylinderShape, direction: Vector3): Vector3
