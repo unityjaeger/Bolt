@@ -205,7 +205,7 @@ tree:move(id: number, cf: CFrame)
 
 Updates the position/orientation of an object. Use this when the object moves or rotates.
 
-Tt's fine to call this every frame as it will not trigger a reinsertion if its still within the bounds of the padded AABB.
+It's fine to call this every frame as it will not trigger a reinsertion if its still within the bounds of the padded AABB.
 
 ```lua
 tree:resize(id: number, shape: Shape)
@@ -214,7 +214,9 @@ tree:resize(id: number, shape: Shape)
 Updates the shape of an object. Use this when the object's shape changes in any way.
 
 ### Querying
-All query functions return a list of IDs whose AABBs overlap the query volume. These are only candidates, you still need to run a narrow phase check against each one.
+All query functions return a list of IDs whose AABBs overlap the query volume. 
+
+These are only candidates, you still need to run a narrow phase check against each one.
 
 ```lua
 tree:query_aabb(min: Vector3, max: Vector3): {number}
