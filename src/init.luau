@@ -1,12 +1,13 @@
 --!strict
 
-local types = require(script.types)
-local shape_map = require(script.shape_map)
-local box = require(script.box)
-local sphere = require(script.sphere)
-local capsule = require(script.capsule)
-local ray = require(script.ray)
-local gjk = require(script.gjk)
+local types = require("@self/types")
+local shape_map = require("@self/shape_map")
+local box = require("@self/box")
+local sphere = require("@self/sphere")
+local capsule = require("@self/capsule")
+local ray = require("@self/ray")
+local gjk = require("@self/gjk")
+local aabb_tree = require("@self/aabb_tree")
 
 local UP = Vector3.yAxis
 local RIGHT = Vector3.xAxis
@@ -44,12 +45,15 @@ end
 
 local function create_wedge(size: Vector3): types.WedgeShape
 	local half_extents = size / 2	
-	local sx, sy, sz = half_extents.X, half_extents.Y, half_extents.Z
 
-	local v1 = RIGHT * sx + LOOK * sz - UP * sy
-	local v2 = v1 - LOOK * sz * 2
-	local v3 = v2 + UP * sy * 2
-	
+	local sr = half_extents.X * RIGHT
+	local su = half_extents.Y * UP
+	local sl = half_extents.Z * LOOK
+
+	local v1 = sr + sl - su
+	local v2 = sr - sl - su
+	local v3 = sr - sl + su
+
 	return {
 		type = shape_map.WEDGE,
 		vertices = {v1, v2, v3},
@@ -59,14 +63,17 @@ end
 
 local function create_corner_wedge(size: Vector3): types.CornerWedgeShape
 	local half_extents = size / 2	
-	local sx, sy, sz = half_extents.X, half_extents.Y, half_extents.Z
-	
-	local v1 = RIGHT * sx + LOOK * sz - UP * sy
-	local v2 = v1 - LOOK * sz * 2
-	local v3 = v1 + UP * sy * 2
-	local v4 = v2 - RIGHT * sx * 2
-	local v5 = v4 + LOOK * sz * 2
-	
+
+	local sr = half_extents.X * RIGHT
+	local su = half_extents.Y * UP
+	local sl = half_extents.Z * LOOK
+
+	local v1 = sr + sl - su
+	local v2 = sr - sl - su
+	local v3 = sr + sl + su
+	local v4 = -sr - sl - su
+	local v5 = -sr + sl - su
+
 	return {
 		type = shape_map.CORNER_WEDGE,
 		vertices = {v1, v2, v3, v4, v5},
@@ -87,7 +94,7 @@ local function create_from_part(part: BasePart): types.Shape
 	elseif part:IsA("Part") then
 		local shape = (part :: Part).Shape
 		local size = part.Size
-		
+
 		if shape == Enum.PartType.Block then
 			return create_box(size)
 		elseif shape == Enum.PartType.Ball then
@@ -123,7 +130,7 @@ return {
 	create_corner_wedge = create_corner_wedge,
 	create_mesh = create_mesh,
 	create_from_part = create_from_part,
-	
+
 	collision = {
 		box_box = box.box_box,
 		box_sphere = box.box_sphere,
@@ -132,17 +139,21 @@ return {
 		sphere_capsule = sphere.sphere_capsule,
 		capsule_capsule = capsule.capsule_capsule
 	},
-	
+
 	raycast = {
 		box = ray.ray_box,
 		sphere = ray.ray_sphere,
 		capsule = ray.ray_capsule
 	},
-	
+
 	gjk = {
 		intersects = gjk.intersects,
 		raycast = gjk.raycast,
 		shapecast_simple = gjk.shapecast_simple,
 		shapecast = gjk.shapecast
+	},
+
+	aabb_tree = {
+		new = aabb_tree.new_dynamic
 	}
 }
