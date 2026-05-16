@@ -71,13 +71,13 @@ end
 local function ray_aabb(ray_origin: Vector3, ray_inv_dir: Vector3, min: vector, max: vector): boolean
 	local t1 = (min - ray_origin :: any) * ray_inv_dir
 	local t2 = (max - ray_origin :: any) * ray_inv_dir
-	
+
 	local min_vec = vector.min(t1, t2)
 	local max_vec = vector.max(t1, t2)
-	
+
 	local tmin = math.max(min_vec.x, min_vec.y, min_vec.z)
 	local tmax = math.min(max_vec.x, max_vec.y, max_vec.z)
-	
+
 	return tmax >= math.max(tmin, 0) and tmin <= 1
 end
 
@@ -95,9 +95,9 @@ local function shape_aabb(cf: CFrame, shape): (vector, vector)
 	elseif shape.type == shape_map.SPHERE then
 		local radius = (shape :: types.SphereShape).radius
 		local center = cf.Position
-		
+
 		local e = vector.one * radius
-		
+
 		return center - e :: any, center + e :: any
 	elseif shape.type == shape_map.CAPSULE then
 		local radius = (shape :: types.CapsuleShape).radius
@@ -175,12 +175,12 @@ end
 
 local function alloc(dyn_tree: DynamicTree): number
 	local index
-	
+
 	if dyn_tree.free_list ~= NULL then
 		index = dyn_tree.free_list
 		local node = dyn_tree.nodes[index]
 		dyn_tree.free_list = node.parent
-		
+
 		node.parent = NULL
 		node.child1 = NULL
 		node.child2 = NULL
@@ -194,7 +194,7 @@ local function alloc(dyn_tree: DynamicTree): number
 			height = -1
 		} :: any
 	end
-	
+
 	return index
 end
 
@@ -207,38 +207,38 @@ end
 
 local function find_best_sibling(dyn_tree: DynamicTree, min: vector, max: vector): number
 	local nodes = dyn_tree.nodes
-	
+
 	local centerD = (min + max) / 2
 	local areaD = aabb_sah(min, max)
-	
+
 	local root_index = dyn_tree.root
 	local root = nodes[root_index]
-	
+
 	local area_base = aabb_sah(root.aabb_min, root.aabb_max)
-	
+
 	local direct_cost = union_sah(root.aabb_min, root.aabb_max, min, max)
 	local inherited_cost = 0
-	
+
 	local best_sibling = root_index
 	local best_cost = direct_cost
-	
+
 	local index = root_index
 	while nodes[index].height > 0 do
 		local child1_index = nodes[index].child1
 		local child2_index = nodes[index].child2
-		
+
 		local cost = direct_cost + inherited_cost
-		
+
 		if cost < best_cost then
 			best_sibling = index
 			best_cost = cost
 		end
-		
+
 		inherited_cost += direct_cost - area_base
-		
+
 		local leaf1 = nodes[child1_index].height == 0
 		local leaf2 = nodes[child2_index].height == 0
-		
+
 		local lower_cost1 = HUGE
 		local child1 = nodes[child1_index]
 		local direct_cost1 = union_sah(child1.aabb_min, child1.aabb_max, min, max)
@@ -253,7 +253,7 @@ local function find_best_sibling(dyn_tree: DynamicTree, min: vector, max: vector
 			area1 = aabb_sah(child1.aabb_min, child1.aabb_max)
 			lower_cost1 = inherited_cost + direct_cost1 + math.min(areaD - area1, 0)
 		end
-		
+
 		local lower_cost2 = HUGE
 		local child2 = nodes[child2_index]
 		local direct_cost2 = union_sah(child2.aabb_min, child2.aabb_max, min, max)
@@ -268,22 +268,22 @@ local function find_best_sibling(dyn_tree: DynamicTree, min: vector, max: vector
 			area2 = aabb_sah(child2.aabb_min, child2.aabb_max)
 			lower_cost2 = inherited_cost + direct_cost2 + math.min(areaD - area2, 0)
 		end
-		
+
 		if leaf1 and leaf2 then
 			break
 		end
-		
+
 		if best_cost <= lower_cost1 and best_cost <= lower_cost2 then
 			break
 		end
-		
+
 		if lower_cost1 == lower_cost2 and leaf1 == false then
 			local d1 = (child1.aabb_min + child1.aabb_max) / 2 - centerD
 			local d2 = (child2.aabb_min + child2.aabb_max) / 2 - centerD
 			lower_cost1 = vector.dot(d1, d1)
 			lower_cost2 = vector.dot(d2, d2)
 		end
-		
+
 		if lower_cost1 < lower_cost2 and leaf1 == false then
 			index = child1_index
 			area_base = area1
@@ -294,7 +294,7 @@ local function find_best_sibling(dyn_tree: DynamicTree, min: vector, max: vector
 			direct_cost = direct_cost2
 		end
 	end
-	
+
 	return best_sibling
 end
 
@@ -305,53 +305,53 @@ local function rotate(dyn_tree: DynamicTree, iA: number)
 	if A.height < 2 then
 		return
 	end
-	
+
 	local iB = A.child1
 	local iC = A.child2
-	
+
 	local B = nodes[iB]
 	local C = nodes[iC]
-	
+
 	if B.height == 0 then
 		local iF = C.child1
 		local iG = C.child2
 		local F = nodes[iF]
 		local G = nodes[iG]
-		
+
 		local cost_base = aabb_sah(C.aabb_min, C.aabb_max)
-		
+
 		local aabbBG_min, aabbBG_max = aabb_union(B.aabb_min, B.aabb_max, G.aabb_min, G.aabb_max)
 		local costBF = aabb_sah(aabbBG_min, aabbBG_max)
-		
+
 		local aabbBF_min, aabbBF_max = aabb_union(B.aabb_min, B.aabb_max, F.aabb_min, F.aabb_max)
 		local costBG = aabb_sah(aabbBF_min, aabbBF_max)
-		
+
 		if cost_base < costBF and cost_base < costBG then
 			return
 		end
-		
+
 		if costBF < costBG then
 			A.child1 = iF
 			C.child1 = iB
-			
+
 			B.parent = iC
 			F.parent = iA 
-			
+
 			C.aabb_min = aabbBG_min
 			C.aabb_max = aabbBG_max
-			
+
 			C.height = 1 + math.max(B.height, G.height)
 			A.height = 1 + math.max(C.height, F.height)
 		else
 			A.child1 = iG
 			C.child2 = iB
-			
+
 			B.parent = iC
 			G.parent = iA
-			
+
 			C.aabb_min = aabbBF_min
 			C.aabb_max = aabbBF_max
-			
+
 			C.height = 1 + math.max(B.height, F.height)
 			A.height = 1 + math.max(C.height, G.height)
 		end
@@ -360,41 +360,41 @@ local function rotate(dyn_tree: DynamicTree, iA: number)
 		local iE = B.child2
 		local D = nodes[iD]
 		local E = nodes[iE]
-		
+
 		local cost_base = aabb_sah(B.aabb_min, B.aabb_max)
-		
+
 		local aabbCE_min, aabbCE_max = aabb_union(C.aabb_min, C.aabb_max, E.aabb_min, E.aabb_max)
 		local costCD = aabb_sah(aabbCE_min, aabbCE_max)
-		
+
 		local aabbCD_min, aabbCD_max = aabb_union(C.aabb_min, C.aabb_max, D.aabb_min, D.aabb_max)
 		local costCE = aabb_sah(aabbCD_min, aabbCD_max)
-		
+
 		if cost_base < costCD and cost_base < costCE then
 			return
 		end
-		
+
 		if costCD < costCE then
 			A.child2 = iD
 			B.child1 = iC
-			
+
 			C.parent = iB
 			D.parent = iA
-			
+
 			B.aabb_min = aabbCE_min
 			B.aabb_max = aabbCE_max
-			
+
 			B.height = 1 + math.max(C.height, E.height)
 			A.height = 1 + math.max(B.height, D.height)
 		else
 			A.child2 = iE
 			B.child2 = iC
-			
+
 			C.parent = iB
 			E.parent = iA
-			
+
 			B.aabb_min = aabbCD_min
 			B.aabb_max = aabbCD_max
-			
+
 			B.height = 1 + math.max(C.height, D.height)
 			A.height = 1 + math.max(B.height, E.height)
 		end
@@ -403,92 +403,92 @@ local function rotate(dyn_tree: DynamicTree, iA: number)
 		local iE = B.child2
 		local iF = C.child1
 		local iG = C.child2
-		
+
 		local D = nodes[iD]
 		local E = nodes[iE]
 		local F = nodes[iF]
 		local G = nodes[iG]
-		
+
 		local areaB = aabb_sah(B.aabb_min, B.aabb_max)
 		local areaC = aabb_sah(C.aabb_min, C.aabb_max)
 		local cost_base = areaB + areaC
 		local best_rotation = nil
 		local best_cost = cost_base
-		
+
 		local aabbBG_min, aabbBG_max = aabb_union(B.aabb_min, B.aabb_max, G.aabb_min, G.aabb_max)
 		local costBF = areaB + aabb_sah(aabbBG_min, aabbBG_max)
 		if costBF < best_cost then
 			best_rotation = 1
 			best_cost = costBF
 		end
-		
+
 		local aabbBF_min, aabbBF_max = aabb_union(B.aabb_min, B.aabb_max, F.aabb_min, F.aabb_max)
 		local costBG = areaB + aabb_sah(aabbBF_min, aabbBF_max)
 		if costBG < best_cost then
 			best_rotation = 2
 			best_cost = costBG
 		end
-		
+
 		local aabbCE_min, aabbCE_max = aabb_union(C.aabb_min, C.aabb_max, E.aabb_min, E.aabb_max)
 		local costCD = areaC + aabb_sah(aabbCE_min, aabbCE_max)
 		if costCD < best_cost then
 			best_rotation = 3
 			best_cost = costCD
 		end
-		
+
 		local aabbCD_min, aabbCD_max = aabb_union(C.aabb_min, C.aabb_max, D.aabb_min, D.aabb_max)
 		local costCE = areaC + aabb_sah(aabbCD_min, aabbCD_max)
 		if costCE < best_cost then
 			best_rotation = 4
 			--best_cost = costCD -> not necessary to update as we dont use it below
 		end
-		
+
 		if best_rotation == 1 then
 			A.child1 = iF
 			C.child1 = iB
-			
+
 			B.parent = iC
 			F.parent = iA
-			
+
 			C.aabb_min = aabbBG_min
 			C.aabb_max = aabbBG_max
-			
+
 			C.height = 1 + math.max(B.height, G.height)
 			A.height = 1 + math.max(C.height, F.height)
 		elseif best_rotation == 2 then
 			A.child1 = iG
 			C.child2 = iB
-			
+
 			B.parent = iC
 			G.parent = iA
-			
+
 			C.aabb_min = aabbBF_min
 			C.aabb_max = aabbBF_max
-			
+
 			C.height = 1 + math.max(B.height, F.height)
 			A.height = 1 + math.max(C.height, G.height)
 		elseif best_rotation == 3 then
 			A.child2 = iD
 			B.child1 = iC
-			
+
 			C.parent = iB
 			D.parent = iA
-			
+
 			B.aabb_min = aabbCE_min
 			B.aabb_max = aabbCE_max
-			
+
 			B.height = 1 + math.max(C.height, E.height)
 			A.height = 1 + math.max(B.height, D.height)
 		elseif best_rotation == 4 then
 			A.child2 = iE
 			B.child2 = iC
-			
+
 			C.parent = iB
 			E.parent = iA
-			
+
 			B.aabb_min = aabbCD_min
 			B.aabb_max = aabbCD_max
-			
+
 			B.height = 1 + math.max(C.height, D.height)
 			A.height = 1 + math.max(B.height, E.height)
 		end
@@ -497,18 +497,18 @@ end
 
 local function refit(dyn_tree: DynamicTree, index: number, should_rotate: boolean)
 	local nodes = dyn_tree.nodes
-	
+
 	while index ~= NULL do
 		local node = nodes[index]
 		local child1 = nodes[node.child1]
 		local child2 = nodes[node.child2]
-		
+
 		node.aabb_min, node.aabb_max = aabb_union(child1.aabb_min, child1.aabb_max, child2.aabb_min, child2.aabb_max)
-		
+
 		if should_rotate then
 			rotate(dyn_tree, index)
 		end
-		
+
 		index = node.parent
 	end
 end
@@ -520,12 +520,12 @@ local function insert_leaf(dyn_tree: DynamicTree, leaf: number)
 		nodes[leaf].parent = NULL
 		return
 	end
-	
+
 	local new_leaf = nodes[leaf]
-	
+
 	local sibling_index = find_best_sibling(dyn_tree, new_leaf.aabb_min, new_leaf.aabb_max)
 	local sibling = nodes[sibling_index]
-	
+
 	local old_parent = sibling.parent
 	local new_parent_index = alloc(dyn_tree)
 
@@ -546,7 +546,7 @@ local function insert_leaf(dyn_tree: DynamicTree, leaf: number)
 			grand_parent.child2 = new_parent_index
 		end
 	end
-	
+
 	nodes[sibling_index].parent = new_parent_index
 	nodes[leaf].parent = new_parent_index
 
@@ -577,9 +577,9 @@ local function remove_leaf(dyn_tree: DynamicTree, leaf: number)
 		else
 			grand_parent.child2 = sibling
 		end
-		
+
 		nodes[sibling].parent = grand_parent_index
-		
+
 		free(dyn_tree, parent_index)
 		refit(dyn_tree, grand_parent_index, false)
 	end
@@ -587,18 +587,18 @@ end
 
 local function public_insert(dyn_tree: DynamicTree, id: number, cf: CFrame, shape: types.Shape)
 	local min, max = shape_aabb(cf, shape)
-	
+
 	local index = alloc(dyn_tree)
 	local node = dyn_tree.nodes[index]
 	local padding = dyn_tree.padding
-	
+
 	node.aabb_min = min - padding
 	node.aabb_max = max + padding
 	node.height = 0
 	node.id = id
 	node.cf = cf
 	node.shape = shape
-	
+
 	dyn_tree.leaf_map[id] = index
 	insert_leaf(dyn_tree, index)
 end
@@ -608,7 +608,7 @@ local function public_remove(dyn_tree: DynamicTree, id: number)
 	if not index then
 		return
 	end
-	
+
 	dyn_tree.leaf_map[id] = nil
 	remove_leaf(dyn_tree, index)
 	free(dyn_tree, index)
@@ -618,20 +618,20 @@ local function public_move(dyn_tree: DynamicTree, id: number, cf: CFrame)
 	local index = dyn_tree.leaf_map[id]
 	local node = dyn_tree.nodes[index]
 	local min, max = shape_aabb(cf, node.shape)
-	
+
 	if aabb_contains(node.aabb_min, node.aabb_max, min, max) then
 		node.cf = cf
 		return
 	end
-	
+
 	local padding = dyn_tree.padding
-	
+
 	remove_leaf(dyn_tree, index)
-	
+
 	node.aabb_min = min - padding
 	node.aabb_max = max + padding
 	node.cf = cf
-	
+
 	insert_leaf(dyn_tree, index)
 end
 
@@ -639,13 +639,13 @@ local function public_resize(dyn_tree: DynamicTree, id: number, shape: types.Sha
 	local index = dyn_tree.leaf_map[id]
 	local node = dyn_tree.nodes[index]
 	local min, max = shape_aabb(node.cf, shape)
-	
+
 	remove_leaf(dyn_tree, index)
-	
+
 	node.aabb_min = min
 	node.aabb_max = max
 	node.shape = shape
-	
+
 	insert_leaf(dyn_tree, index)
 end
 
@@ -659,21 +659,21 @@ end
 local function public_query_aabb(dyn_tree: DynamicTree, min: Vector3, max: Vector3): {number}
 	local nodes = dyn_tree.nodes
 	local root = dyn_tree.root
-	
+
 	if root == NULL then
 		return {}
 	end
-	
+
 	table.clear(query_traversal_stack)
 	table.insert(query_traversal_stack, root)
-	
+
 	local out = {}
 	local top = 1
-	
+
 	while top > 0 do
 		local index = query_traversal_stack[top]
 		top -= 1
-		
+
 		local node = nodes[index]
 		if aabb_overlap(node.aabb_min, node.aabb_max, min :: any, max :: any) then
 			if node.child1 == NULL then
@@ -686,8 +686,13 @@ local function public_query_aabb(dyn_tree: DynamicTree, min: Vector3, max: Vecto
 			end
 		end
 	end
-	
+
 	return out :: {number}
+end
+
+local function public_query_shape(dyn_tree: DynamicTree, cframe: CFrame, shape: types.Shape): {number}
+	local min, max = shape_aabb(cframe, shape)
+	return public_query_aabb(dyn_tree, min :: any, max :: any)
 end
 
 local function public_query_ray(dyn_tree: DynamicTree, ray_origin: Vector3, ray_direction: Vector3): {number}
@@ -703,9 +708,9 @@ local function public_query_ray(dyn_tree: DynamicTree, ray_origin: Vector3, ray_
 
 	local out = {}
 	local top = 1
-	
+
 	local inv_ray_dir = 1 / ray_direction
-	
+
 	while top > 0 do
 		local index = query_traversal_stack[top]
 		top -= 1
@@ -729,23 +734,23 @@ end
 local function public_query_shapecast(dyn_tree: DynamicTree, shape: types.Shape, shape_cf: CFrame, direction: Vector3): {number}
 	local nodes = dyn_tree.nodes
 	local root = dyn_tree.root
-	
+
 	if root == NULL then
 		return {}
 	end
 
 	table.clear(query_traversal_stack)
 	table.insert(query_traversal_stack, root)
-	
+
 	local out = {}
 	local top = 1
 
 	local inv_ray_dir = 1 / direction
-	
+
 	local min, max = shape_aabb(shape_cf, shape)
 	local half_extents = (max - min) / 2
 	local ray_origin = shape_cf.Position
-	
+
 	while top > 0 do
 		local index = query_traversal_stack[top]
 		top -= 1
@@ -779,6 +784,7 @@ local function new_dynamic_tree(config: Config): DynamicTree
 		resize = public_resize,
 		clear = public_clear,
 		query_aabb = public_query_aabb,
+        query_shape = public_query_shape,
 		query_ray = public_query_ray,
 		query_shapecast = public_query_shapecast
 	}
