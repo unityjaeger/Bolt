@@ -13,6 +13,12 @@ For unsupported shape combinations, GJK (ported from [Jolt](https://github.com/j
 
 GJK also offers raycasting as well as shapecasting, although there are some pitfalls to watch out for that will be mentioned where relevant.
 
+## Installation
+Either get the .rbxm from the [latest release](https://github.com/unityjaeger/Bolt/releases/latest) or through wally:
+```
+bolt = "unityjaeger/bolt@@0.1.2"
+``` 
+
 ## Getting Started
 The library functions all operate on a cframe (for consistency) and a shape table for a given object, the shape table holds information like radius for spheres, half extents for boxes, etc.
 
