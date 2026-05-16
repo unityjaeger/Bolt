@@ -253,7 +253,7 @@ for id, obj in objects do
 end
 
 -- every frame, update moved objects
-for id, obj in moved_objects do
+for id, obj in objects do
     tree:move(id, obj.cf)
 end
 
