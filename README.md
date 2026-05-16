@@ -49,6 +49,8 @@ bolt.create_corner_wedge(size: Vector3): CornerWedgeShape
 ```lua
 bolt.create_mesh(part: MeshPart): MeshShape
 ```
+> [!WARNING]
+> Only convex mesh parts are supported. If you set the CollisionFidelity of the MeshPart to Hull or Box, GJK will be able to work with it.
 
 ## Conventions
 All cast functions expect direction to be a non-unit vector with the length baked in.
