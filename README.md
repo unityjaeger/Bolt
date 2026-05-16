@@ -251,7 +251,7 @@ Returns all IDs whose AABB is hit by a shapecast.
 ### Usage Example
 ```lua
 -- setup
-local tree = bolt.new_dynamic_tree({ aabb_padding = 1 })
+local tree = bolt.aabb_tree.new({ aabb_padding = 1 })
 
 -- register objects (once, or when they are created)
 for id, obj in objects do
