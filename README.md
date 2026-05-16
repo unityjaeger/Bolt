@@ -1,8 +1,12 @@
 # Bolt
 
-Collision library for simple intersection tests, does not deliver contact information for collisions. (will be expanded later)
+Collision library for simple intersection tests, does not deliver contact information for collisions.
+
+It comes with methods for both broad phase and narrow phase.
 
 ## Features
+Dynamic AABB tree for broad phase culling, with support for shape, AABB, ray, and shapecast queries. Returns candidate IDs that you then pass to narrow phase.
+
 Fully cross-supported primitive shapes: boxes, spheres, capsules and rays each have special-cased implementations for every pairing (box-box, box-sphere, box-ray, sphere-sphere, etc.).
 
 For unsupported shape combinations, GJK (ported from [Jolt](https://github.com/jrouwe/JoltPhysics)) covers all other combinations, with native support functions for boxes, spheres, capsules, cylinders, wedges, corner wedges and convex meshes.
@@ -52,6 +56,8 @@ All GJK functions have an in_tolerance parameter, this describes the minimum dis
 Typically you want to keep this small, unless you are working with really large objects, for most applications a value like 0.001 is good.
 
 ## Collision Functions
+Typically you run a broad phase query on your dynamic tree first to get a set of candidate IDs, then run the appropriate collision function against each candidate.
+
 ### special-cased
 ```lua
 bolt.collision.box_box(box_a_cf: CFrame, box_a_shape: BoxShape, box_b_cf: CFrame, box_b_Shape: BoxShape): boolean
@@ -155,4 +161,100 @@ A sensible default for the convex radii would depend on the size of the shape, b
 > The normal around edges/corners can be different from what you would expect (e.g. not orthogonal to a box face) due to the convex radii, even with a summed convex radius of 0, this will still happen because of the way GJK works.
 
 ## Dynamic AABB Tree
-soon
+The dynamic AABB tree is used for broad phase, it quickly narrows down which objects are worth running a narrow phase check against.
+
+Each object in the tree is identified by a numeric ID that you own and manage.
+
+```lua
+local tree = bolt.new_dynamic_tree(config): DynamicTree
+```
+
+### Config
+
+| Field | Type | Description |
+|---|---|---|
+| aabb_padding | number | Extra padding added to every every side of the AABB. This avoids reinsertions on small movements, saving a lot of performance for moving objects.
+
+### Inserting and removing objects
+
+```lua
+tree:insert(id: number, cf: CFrame, shape: Shape)
+```
+
+Inserts an object into the tree. id is your own identifier (e.g. an index in your own object table).
+
+The AABB is computed from cf and shape and expanded by the configured padding.
+
+```lua
+tree:remove(id: number)
+```
+
+Removes the object with the given ID from the tree.
+
+### Updating Objects
+
+```lua
+tree:move(id: number, cf: CFrame)
+```
+
+Updates the position/orientation of an object. Use this when the object moves or rotates.
+
+Tt's fine to call this every frame as it will not trigger a reinsertion if its still within the bounds of the padded AABB.
+
+```lua
+tree:resize(id: number, shape: Shape)
+```
+
+Updates the shape of an object. Use this when the object's shape changes in any way.
+
+### Querying
+All query functions return a list of IDs whose AABBs overlap the query volume. These are only candidates, you still need to run a narrow phase check against each one.
+
+```lua
+tree:query_aabb(min: Vector3, max: Vector3): {number}
+```
+
+Returns all IDs whose AABB overlaps the given axis-aligned bounding box.
+
+```lua
+tree:query_shape(cf: CFrame, shape: Shape): {number}
+```
+
+Returns all IDs whose AABB overlaps the AABB of the given shape. Convenient shorthand for computing the min/max yourself and calling query_aabb.
+
+```lua
+tree:query_ray(ray_origin: Vector3, ray_direction: Vector3): {number}
+```
+
+Returns all IDs whose AABB is hit by the ray. The same convention applies as with narrow phase raycasting, ray_direction is a non-unit vector with the length baked in.
+
+```lua
+tree:query_shapecast(start: CFrame, direction: Vector3, shape: Shape): {number}
+```
+
+Returns all IDs whose AABB is hit by a shapecast.
+
+### Usage Example
+```lua
+-- setup
+local tree = bolt.new_dynamic_tree({ aabb_padding = 1 })
+
+-- register objects (once, or when they are created)
+for id, obj in objects do
+    tree:insert(id, obj.cf, obj.shape)
+end
+
+-- every frame, update moved objects
+for id, obj in moved_objects do
+    tree:move(id, obj.cf)
+end
+
+-- broad + narrow phase query
+local candidates = tree:query_aabb(query_min, query_max)
+for _, id in candidates do
+    local obj = objects[id]
+    if bolt.collision.box_box(query_cf, query_shape, obj.cf, obj.shape) then
+        -- confirmed hit
+    end
+end
+```
