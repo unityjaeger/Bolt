@@ -30,7 +30,9 @@ type DynamicTree = {
 	resize: (dyn_tree: DynamicTree, id: number, shape: types.Shape) -> (),
 	clear: (dyn_tree: DynamicTree) -> (),
 	query_aabb: (dyn_tree: DynamicTree, min: Vector3, max: Vector3) -> {number},
-	query_ray: (dyn_tree: DynamicTree, ray_origin: Vector3, ray_direction: Vector3) -> {number}
+	query_ray: (dyn_tree: DynamicTree, ray_origin: Vector3, ray_direction: Vector3) -> {number},
+    query_shape: (dyn_tree: DynamicTree, cframe: CFrame, shape: types.Shape) -> {number},
+    query_shapecast: (dyn_tree: DynamicTree, shape: types.Shape, origin: CFrame, direction: Vector3) -> {number}
 }
 
 type Config = {
@@ -731,7 +733,7 @@ local function public_query_ray(dyn_tree: DynamicTree, ray_origin: Vector3, ray_
 	return out :: {number}
 end
 
-local function public_query_shapecast(dyn_tree: DynamicTree, shape: types.Shape, shape_cf: CFrame, direction: Vector3): {number}
+local function public_query_shapecast(dyn_tree: DynamicTree, shape: types.Shape, origin: CFrame, direction: Vector3): {number}
 	local nodes = dyn_tree.nodes
 	local root = dyn_tree.root
 
@@ -747,9 +749,9 @@ local function public_query_shapecast(dyn_tree: DynamicTree, shape: types.Shape,
 
 	local inv_ray_dir = 1 / direction
 
-	local min, max = shape_aabb(shape_cf, shape)
+	local min, max = shape_aabb(origin, shape)
 	local half_extents = (max - min) / 2
-	local ray_origin = shape_cf.Position
+	local ray_origin = origin.Position
 
 	while top > 0 do
 		local index = query_traversal_stack[top]
