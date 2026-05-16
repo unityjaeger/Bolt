@@ -242,6 +242,10 @@ tree:query_shapecast(start: CFrame, direction: Vector3, shape: Shape): {number}
 
 Returns all IDs whose AABB is hit by a shapecast.
 
+> [!NOTE]
+> If you want to generalize the narrow phase check after a query, you can look at the type stored in the shape table to figure out the collision function thats needed, look at [shape_map](https://github.com/unityjaeger/Bolt/blob/main/src/shape_map.luau) for the mapping.
+> If you are using gjk, its even easier as the gjk function already takes generalized shapes.
+
 ### Usage Example
 ```lua
 -- setup
