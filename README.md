@@ -88,8 +88,10 @@ bolt.collision.capsule_capsule(capsule_a_cf: CFrame, capsule_a_shape: CapsuleSha
 All combinations not covered by the above special-cased functions will have to be done through GJK.
 
 ```lua
-bolt.gjk.intersects(transform_b_in_a: CFrame, shape_a: types.Shape, shape_b: types.Shape, in_tolerance: number): boolean
+bolt.gjk.intersects(transform_b_in_a: CFrame, shape_a: Shape, shape_b: Shape, in_tolerance: number, io_v: Vector3): boolean
 ```
+
+io_v is the initial seperating vector, it can be used to warm start gjk so it converges in fewer iterations, however this is only relevant if the collision detection goes on for multiple frames between 2 objects, so just pass Vector3.zero to io_v for now.
 
 > [!NOTE]
 > transform_b_in_a can be calculated with:
