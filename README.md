@@ -172,7 +172,7 @@ The dynamic AABB tree is used for broad phase, it quickly narrows down which obj
 Each object in the tree is identified by a numeric ID that you own and manage.
 
 ```lua
-local tree = bolt.new_dynamic_tree(config): DynamicTree
+local tree = bolt.aabb_tree.new(config): DynamicTree
 ```
 
 ### Config
