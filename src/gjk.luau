@@ -530,8 +530,6 @@ local function shapecast_simple<T, U>(start: CFrame, direction: Vector3, in_tole
 	local v_len_sq = HUGE
 	local allow_restart = false
 
-	local out_normal
-
 	while true do
 		local p = support_b(shape_b, v) - support_a(shape_a, -v)
 		local w = x - p
@@ -555,7 +553,6 @@ local function shapecast_simple<T, U>(start: CFrame, direction: Vector3, in_tole
 				return false, nil
 			end
 
-			out_normal = v
 			x = origin + lambda * direction
 			v_len_sq = HUGE
 			allow_restart = true
