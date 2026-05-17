@@ -295,6 +295,10 @@ end
 
 ## Static AABB Trees
 For geometry that never moves, Bolt provides a static variant built using binned SAH, which produces high quality trees at the cost of being slower to fully rebuild. Because of this it should only be built once.
+```lua
+bolt.aabb_tree.new_static() -> StaticTree
+```
+There is no configuration for static trees as they don't need padding.
 
 The API is the same as the dynamic tree except:
 - Only insert and remove are available, no move or resize
