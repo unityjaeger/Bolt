@@ -196,7 +196,7 @@ local function get_closest_point_on_triangle(in_a: Vector3, in_b: Vector3, in_c:
 	if d6 >= 0 and d5 <= d6 then
 		return c, swap and 0b0001 or 0b0100
 	end
-	
+
 	if d5 * d2 <= d1 * d6 and d2 >= 0 and d6 <= 0 then
 		local w = d2 / (d2 - d6)
 		return a + w * ac, 0b0101
@@ -518,20 +518,19 @@ end
 local function shapecast_simple<T, U>(start: CFrame, direction: Vector3, in_tolerance: number, shape_a: types.Shape & T, shape_b: types.Shape & U): (boolean, Vector3?)
 	local support_a = support_map[shape_a.type]
 	local support_b = support_map[shape_b.type]
-	local origin = start.Position
 
 	local tolerance_sq = in_tolerance * in_tolerance
 
 	m_num_points = 0
 
 	local lambda = 0
-	local x = origin
-	local v = x - support_b(shape_b, V_ZERO) - support_a(shape_a, V_ZERO)
+	local x = V_ZERO
+	local v = ptws(start, support_a(shape_a, V_ZERO)) - support_b(shape_b, V_ZERO)
 	local v_len_sq = HUGE
 	local allow_restart = false
 
 	while true do
-		local p = support_b(shape_b, v) - support_a(shape_a, -v)
+		local p = support_b(shape_b, v) - ptws(start, support_a(shape_a, vtos(start, -v)))
 		local w = x - p
 
 		local v_dot_w = vector.dot(v :: any, w :: any)
@@ -553,7 +552,7 @@ local function shapecast_simple<T, U>(start: CFrame, direction: Vector3, in_tole
 				return false, nil
 			end
 
-			x = origin + lambda * direction
+			x = lambda * direction
 			v_len_sq = HUGE
 			allow_restart = true
 		end
@@ -666,11 +665,11 @@ local function shapecast<T, U>(start: CFrame, direction: Vector3, in_tolerance: 
 		end
 
 		update_point_set_pq(set)
-		
+
 		if v_len_sq <= tolerance_sq then
 			break
 		end
-		
+
 		prev_v = v
 	end
 
@@ -691,7 +690,7 @@ local function shapecast<T, U>(start: CFrame, direction: Vector3, in_tolerance: 
 		local bu, bv, bw = get_barycentric_coordinates_3d(m_y[1], m_y[2], m_y[3])
 		point = bu * m_q[1] + bv * m_q[2] + bw * m_q[3] + offset_b
 	end
-	
+
 	local out_normal = sum_convex_radius > 0 and normalized_v or vector.dot(prev_v :: any, prev_v :: any) < FLT_EPSILON and V_ZERO or vector.normalize(prev_v :: any)
 	return point, lambda * vector.magnitude(direction :: any), out_normal
 end

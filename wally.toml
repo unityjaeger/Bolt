@@ -2,7 +2,7 @@
 name = "unityjaeger/bolt"
 description = "Custom collision detection"
 authors = ["unityjaeger"]
-version = "0.2.0"
+version = "0.2.1"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
 license = "MIT"
