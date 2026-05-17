@@ -154,6 +154,7 @@ return {
 	},
 
 	aabb_tree = {
-		new = aabb_tree.new_dynamic
+		new = aabb_tree.new_dynamic,
+		new_static = aabb_tree.new_static
 	}
 }
