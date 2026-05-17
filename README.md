@@ -251,18 +251,22 @@ Returns all IDs whose AABB is hit by a shapecast.
 > If you are using gjk, its even easier as the gjk function already takes generalized shapes.
 
 ## Rebuilds
-Tree quality may degrade as you keep moving/inserting/removing objects in the tree, now this is not an issue for the majority of games or use cases. But if you see query performance getting worse and worse as time goes on, you might need to rebuild the tree ever so often.
+Tree quality may degrade as you keep moving/inserting/removing objects in the tree, now this is not an issue for the majority of games or use cases.
+
+If you see query performance getting worse and worse as time goes on, you might need to rebuild the tree ever so often.
 
 ```lua
-should_rebuild: (dyn_tree: DynamicTree) -> boolean,
+tree:should_rebuild: (dyn_tree: DynamicTree) -> boolean,
 ```
 This method lets you know if the tree quality has degraded enough to be worth rebuilding, you can check this periodically (like every 10 seconds).
 
 ```lua
-partial_rebuild: (dyn_tree: DynamicTree) -> number
-full_rebuild: (tree: Tree) -> number
+tree:partial_rebuild: (dyn_tree: DynamicTree) -> number
+tree:full_rebuild: (tree: Tree) -> number
 ```
-These methods are for rebuilding the tree, full_rebuild fully tears down the tree and reconstructs it while partial_rebuild reuses good branches to perform less work. For a dynamic tree you want to be using partial_rebuild mainly.
+These methods are for rebuilding the tree, full_rebuild fully tears down the tree and reconstructs it while partial_rebuild reuses good branches to perform less work. 
+
+For a dynamic tree you want to be using partial_rebuild mainly.
 
 ### Usage Example
 ```lua
