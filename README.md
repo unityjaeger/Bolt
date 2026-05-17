@@ -250,6 +250,20 @@ Returns all IDs whose AABB is hit by a shapecast.
 > If you want to generalize the narrow phase check after a query, you can look at the type stored in the shape table to figure out the collision function thats needed, look at [shape_map](https://github.com/unityjaeger/Bolt/blob/main/src/shape_map.luau) for the mapping.
 > If you are using gjk, its even easier as the gjk function already takes generalized shapes.
 
+## Rebuilds
+Tree quality may degrade as you keep moving/inserting/removing objects in the tree, now this is not an issue for the majority of games or use cases. But if you see query performance getting worse and worse as time goes on, you might need to rebuild the tree ever so often.
+
+```lua
+should_rebuild: (dyn_tree: DynamicTree) -> boolean,
+```
+This method lets you know if the tree quality has degraded enough to be worth rebuilding, you can check this periodically (like every 10 seconds).
+
+```lua
+partial_rebuild: (dyn_tree: DynamicTree) -> number
+full_rebuild: (tree: Tree) -> number
+```
+These methods are for rebuilding the tree, full_rebuild fully tears down the tree and reconstructs it while partial_rebuild reuses good branches to perform less work. For a dynamic tree you want to be using partial_rebuild mainly.
+
 ### Usage Example
 ```lua
 -- setup
@@ -274,3 +288,13 @@ for _, id in candidates do
     end
 end
 ```
+
+## Static AABB Trees
+For geometry that never moves, Bolt provides a static variant built using binned SAH, which produces high quality trees at the cost of being slower to fully rebuild. Because of this it should only be built once.
+
+The API is the same as the dynamic tree except:
+- Only insert and remove are available, no move or resize
+- You must call full_rebuild once after you are done inserting/removing objects
+- should_rebuild and partial_rebuild are not available
+
+A static tree is a good fit for things like level geometry or any set of objects that is fixed for the lifetime of the game.
