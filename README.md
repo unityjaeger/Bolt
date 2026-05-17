@@ -49,6 +49,8 @@ bolt.create_corner_wedge(size: Vector3): CornerWedgeShape
 ```lua
 bolt.create_mesh(part: MeshPart): MeshShape
 ```
+> [!WARNING]
+> Only convex mesh parts are supported. If you set the CollisionFidelity of the MeshPart to Hull or Box, GJK will be able to work with it.
 
 ## Conventions
 All cast functions expect direction to be a non-unit vector with the length baked in.
@@ -88,8 +90,10 @@ bolt.collision.capsule_capsule(capsule_a_cf: CFrame, capsule_a_shape: CapsuleSha
 All combinations not covered by the above special-cased functions will have to be done through GJK.
 
 ```lua
-bolt.gjk.intersects(transform_b_in_a: CFrame, shape_a: types.Shape, shape_b: types.Shape, in_tolerance: number): boolean
+bolt.gjk.intersects(transform_b_in_a: CFrame, shape_a: Shape, shape_b: Shape, in_tolerance: number, io_v: Vector3): boolean
 ```
+
+io_v is the initial seperating vector, it can be used to warm start gjk so it converges in fewer iterations, however this is only relevant if the collision detection goes on for multiple frames between 2 objects, so just pass Vector3.zero to io_v for now.
 
 > [!NOTE]
 > transform_b_in_a can be calculated with:
@@ -172,7 +176,7 @@ The dynamic AABB tree is used for broad phase, it quickly narrows down which obj
 Each object in the tree is identified by a numeric ID that you own and manage.
 
 ```lua
-local tree = bolt.new_dynamic_tree(config): DynamicTree
+local tree = bolt.aabb_tree.new(config): DynamicTree
 ```
 
 ### Config
@@ -205,7 +209,7 @@ tree:move(id: number, cf: CFrame)
 
 Updates the position/orientation of an object. Use this when the object moves or rotates.
 
-Tt's fine to call this every frame as it will not trigger a reinsertion if its still within the bounds of the padded AABB.
+It's fine to call this every frame as it will not trigger a reinsertion if its still within the bounds of the padded AABB.
 
 ```lua
 tree:resize(id: number, shape: Shape)
@@ -214,7 +218,9 @@ tree:resize(id: number, shape: Shape)
 Updates the shape of an object. Use this when the object's shape changes in any way.
 
 ### Querying
-All query functions return a list of IDs whose AABBs overlap the query volume. These are only candidates, you still need to run a narrow phase check against each one.
+All query functions return a list of IDs whose AABBs overlap the query volume. 
+
+These are only candidates, you still need to run a narrow phase check against each one.
 
 ```lua
 tree:query_aabb(min: Vector3, max: Vector3): {number}
@@ -240,10 +246,14 @@ tree:query_shapecast(start: CFrame, direction: Vector3, shape: Shape): {number}
 
 Returns all IDs whose AABB is hit by a shapecast.
 
+> [!NOTE]
+> If you want to generalize the narrow phase check after a query, you can look at the type stored in the shape table to figure out the collision function thats needed, look at [shape_map](https://github.com/unityjaeger/Bolt/blob/main/src/shape_map.luau) for the mapping.
+> If you are using gjk, its even easier as the gjk function already takes generalized shapes.
+
 ### Usage Example
 ```lua
 -- setup
-local tree = bolt.new_dynamic_tree({ aabb_padding = 1 })
+local tree = bolt.aabb_tree.new({ aabb_padding = 1 })
 
 -- register objects (once, or when they are created)
 for id, obj in objects do
@@ -251,7 +261,7 @@ for id, obj in objects do
 end
 
 -- every frame, update moved objects
-for id, obj in moved_objects do
+for id, obj in objects do
     tree:move(id, obj.cf)
 end
 
