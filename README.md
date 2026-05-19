@@ -1,6 +1,6 @@
 # Bolt
 
-Collision library for simple intersection tests, does not deliver contact information for collisions.
+Collision library for intersection tests.
 
 It comes with methods for both broad phase and narrow phase.
 
@@ -11,12 +11,14 @@ Fully cross-supported primitive shapes: boxes, spheres, capsules and rays each h
 
 For unsupported shape combinations, GJK (ported from [Jolt](https://github.com/jrouwe/JoltPhysics)) covers all other combinations, with native support functions for boxes, spheres, capsules, cylinders, wedges, corner wedges and convex meshes.
 
+If contact information is needed, MPR delivers penetration depth, normal and a point on shape A and B.
+
 GJK also offers raycasting as well as shapecasting, although there are some pitfalls to watch out for that will be mentioned where relevant.
 
 ## Installation
 Either get the .rbxm from the [latest release](https://github.com/unityjaeger/Bolt/releases/latest) or through wally:
 ```
-bolt = "unityjaeger/bolt@0.2.1"
+bolt = "unityjaeger/bolt@0.3.0"
 ``` 
 
 ## Getting Started
@@ -60,6 +62,8 @@ Checking for these is different for the special-cased ray functions and the GJK 
 
 All GJK functions expect inputs to be in object space, see each section to see how to calculate this.
 
+Similarly, output points and normals need to be converted back into world space, taking shape A as a reference.
+
 All GJK functions have an in_tolerance parameter, this describes the minimum distance between the two shapes before they count as colliding.
 Typically you want to keep this small, unless you are working with really large objects, for most applications a value like 0.001 is good.
 
@@ -94,6 +98,31 @@ bolt.gjk.intersects(transform_b_in_a: CFrame, shape_a: Shape, shape_b: Shape, in
 ```
 
 io_v is the initial seperating vector, it can be used to warm start gjk so it converges in fewer iterations, however this is only relevant if the collision detection goes on for multiple frames between 2 objects, so just pass Vector3.zero to io_v for now.
+
+> [!NOTE]
+> transform_b_in_a can be calculated with:
+> ```lua
+> local transform_b_in_a = cf_a:ToObjectSpace(cf_b)
+> ```
+
+### MPR
+MPR is used when you need collision information, such as penetration depth, normal and contact points.
+
+```lua
+bolt.mpr.intersects(transform_b_in_a: CFrame, shape_a: Shape, shape_b: Shape, in_tolerance: number): (boolean, Vector3, number?, Vector3?, Vector3?)
+```
+
+The boolean indicates whether or not a hit has occured, the 2nd return value is the normal, even if no hit has occured a normal will be returned to quickly check whether or not the 2 shapes are still seperated.
+The third return value is the penetration depth, and the last 2 return values are the contact points on A and B respectively, these will often happen to be the same point.
+
+```lua
+bolt.mpr.is_seperated(transform_b_in_a: CFrame, cached_normal: Vector3, shape_a: Shape, shape_b: Shape): boolean
+```
+
+Given a normal returned by intersects when an intersection did not take place, quickly check if the shapes are still seperated on that seperation axis.
+This is mainly just an optimization for physics engines, so u can quickly rule out intersections without needing to run full MPR across frames.
+
+The cached_normal that is fed into this function needs to be in shape a's local space. So you need to first convert the normal that mpr returns into world space to get a usable normal, and then for reliability convert that world normal back into shape a's local space when running this function.
 
 > [!NOTE]
 > transform_b_in_a can be calculated with:

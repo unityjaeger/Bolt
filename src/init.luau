@@ -8,6 +8,7 @@ local capsule = require("@self/capsule")
 local ray = require("@self/ray")
 local gjk = require("@self/gjk")
 local aabb_tree = require("@self/aabb_tree")
+local mpr = require("@self/mpr")
 
 local UP = Vector3.yAxis
 local RIGHT = Vector3.xAxis
@@ -156,5 +157,10 @@ return {
 	aabb_tree = {
 		new = aabb_tree.new_dynamic,
 		new_static = aabb_tree.new_static
+	},
+	
+	mpr = {
+		intersects = mpr.intersects,
+		is_seperated = mpr.is_seperated
 	}
 }
