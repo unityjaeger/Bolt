@@ -164,7 +164,7 @@ local function is_seperated<T, U>(transform_b_in_a: CFrame, cached_normal: Vecto
 	local v11 = support_a(shape_a, -cached_normal)
 	local v12 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, cached_normal)))
 	local v_test = v12 - v11
-	if vector.dot(v_test :: any, cached_normal :: any) <= 0 then
+	if vector.dot(v_test :: any, cached_normal :: any) > 0 then
 		return true
 	end
 	
