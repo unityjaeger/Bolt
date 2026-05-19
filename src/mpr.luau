@@ -161,12 +161,12 @@ local function is_seperated<T, U>(transform_b_in_a: CFrame, cached_normal: Vecto
 	local support_a = support_map[shape_a.type]
 	local support_b = support_map[shape_b.type]
 
-	local v11 = support_a(shape_a, -cached_normal)
-	local v12 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, cached_normal)))
+	local v11 = support_a(shape_a, cached_normal)
+	local v12 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -cached_normal)))
 	local v_test = v12 - v11
 	
 	local gap = vector.dot(v_test :: any, cached_normal :: any)
-	return gap < -FLT_EPSILON
+	return gap > FLT_EPSILON
 end
 
 return {
