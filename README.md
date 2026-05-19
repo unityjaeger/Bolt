@@ -18,7 +18,7 @@ GJK also offers raycasting as well as shapecasting, although there are some pitf
 ## Installation
 Either get the .rbxm from the [latest release](https://github.com/unityjaeger/Bolt/releases/latest) or through wally:
 ```
-bolt = "unityjaeger/bolt@0.3.0"
+bolt = "unityjaeger/bolt@0.3.1"
 ``` 
 
 ## Getting Started
