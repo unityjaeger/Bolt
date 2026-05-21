@@ -14,7 +14,10 @@ local V_ZERO = Vector3.zero
 local CF_IDENT = CFrame.identity
 
 local ptws = CF_IDENT.PointToWorldSpace
+local vtws = CF_IDENT.VectorToWorldSpace
 local vtos = CF_IDENT.VectorToObjectSpace
+local ptos = CF_IDENT.PointToObjectSpace
+local tos = CF_IDENT.ToObjectSpace
 
 local m_num_points = 0
 local m_y = table.create(4) :: {Vector3}
@@ -373,20 +376,11 @@ local function update_point_set_pq(set: number)
 	m_num_points = num_points
 end
 
-local function update_point_set_ypq(set: number)
-	local num_points = 0
-	for i = 1, m_num_points do
-		if (bit32.band(set, bit32.lshift(1, i - 1)) ~= 0) then
-			num_points += 1
-			m_y[num_points] = m_y[i]
-			m_p[num_points] = m_p[i]
-			m_q[num_points] = m_q[i]
-		end
-	end
-	m_num_points = num_points
-end
+local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cframe_b: CFrame, shape_b: U & types.Shape, in_tolerance: number, io_v: Vector3?): (boolean, Vector3)
+	io_v = io_v or V_ZERO
 
-local function intersects<T, U>(transform_b_in_a: CFrame, shape_a: types.Shape & T, shape_b: types.Shape & U, in_tolerance: number, io_v: Vector3): (boolean, Vector3)
+	local transform_b_in_a = tos(cframe_a, cframe_b)
+
 	local tolerance_sq = in_tolerance * in_tolerance
 
 	m_num_points = 0
@@ -437,15 +431,18 @@ local function intersects<T, U>(transform_b_in_a: CFrame, shape_a: types.Shape &
 	end
 end
 
-local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, tolerance: number, shape: types.Shape & T): (Vector3?, number?, Vector3?)
-	local tolerance_sq = tolerance * tolerance
+local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, cframe: CFrame, shape: T & types.Shape, in_tolerance: number): (Vector3?, number?, Vector3?)
+	local local_origin = ptos(cframe, ray_origin)
+	local local_direction = vtos(cframe, ray_direction)
+	
+	local tolerance_sq = in_tolerance * in_tolerance
 
 	local support = support_map[shape.type]
 
 	m_num_points = 0
 
 	local lambda = 0
-	local x = ray_origin
+	local x = local_origin
 	local v = x - support(shape, V_ZERO)
 	local v_len_sq = HUGE
 	local allow_restart = false
@@ -458,7 +455,7 @@ local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, tolerance
 
 		local v_dot_w = vector.dot(v :: any, w :: any)
 		if v_dot_w > 0 then
-			local v_dot_r = vector.dot(v :: any, ray_direction :: any)
+			local v_dot_r = vector.dot(v :: any, local_direction :: any)
 			if v_dot_r >= -1e-18 then
 				return nil, nil, nil
 			end
@@ -476,7 +473,7 @@ local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, tolerance
 			end
 
 			out_normal = v
-			x = ray_origin + lambda * ray_direction
+			x = local_origin + lambda * local_direction
 			v_len_sq = HUGE
 			allow_restart = true
 		end
@@ -511,11 +508,18 @@ local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, tolerance
 			break
 		end
 	end
+	
+	out_normal = out_normal and vector.normalize(out_normal :: any) or V_ZERO
+	local world_normal = vtws(cframe, out_normal :: any)
+	local world_point = ptws(cframe, x)
 
-	return x, lambda * vector.magnitude(ray_direction :: any), out_normal and vector.normalize(out_normal :: any) :: any
+	return world_point, lambda * vector.magnitude(ray_direction :: any), world_normal
 end
 
-local function shapecast_simple<T, U>(start: CFrame, direction: Vector3, in_tolerance: number, shape_a: types.Shape & T, shape_b: types.Shape & U): (boolean, Vector3?)
+local function shapecast_simple<T, U>(cframe_a: CFrame, direction: Vector3, shape_a: T & types.Shape, cframe_b: CFrame, shape_b: U & types.Shape, in_tolerance: number): (boolean, number?)
+	local local_start = tos(cframe_b, cframe_a)
+	local local_direction = vtos(cframe_b, direction)
+	
 	local support_a = support_map[shape_a.type]
 	local support_b = support_map[shape_b.type]
 
@@ -525,17 +529,17 @@ local function shapecast_simple<T, U>(start: CFrame, direction: Vector3, in_tole
 
 	local lambda = 0
 	local x = V_ZERO
-	local v = ptws(start, support_a(shape_a, V_ZERO)) - support_b(shape_b, V_ZERO)
+	local v = ptws(local_start, support_a(shape_a, V_ZERO)) - support_b(shape_b, V_ZERO)
 	local v_len_sq = HUGE
 	local allow_restart = false
 
 	while true do
-		local p = support_b(shape_b, v) - ptws(start, support_a(shape_a, vtos(start, -v)))
+		local p = support_b(shape_b, v) - ptws(local_start, support_a(shape_a, vtos(local_start, -v)))
 		local w = x - p
 
 		local v_dot_w = vector.dot(v :: any, w :: any)
 		if v_dot_w > 0 then
-			local v_dot_r = vector.dot(v :: any, direction :: any)
+			local v_dot_r = vector.dot(v :: any, local_direction :: any)
 			if v_dot_r >= -1e-18 then
 				return false, nil
 			end
@@ -552,7 +556,7 @@ local function shapecast_simple<T, U>(start: CFrame, direction: Vector3, in_tole
 				return false, nil
 			end
 
-			x = lambda * direction
+			x = lambda * local_direction
 			v_len_sq = HUGE
 			allow_restart = true
 		end
@@ -591,7 +595,13 @@ local function shapecast_simple<T, U>(start: CFrame, direction: Vector3, in_tole
 	return true, lambda * vector.magnitude(direction :: any) :: any
 end
 
-local function shapecast<T, U>(start: CFrame, direction: Vector3, in_tolerance: number, convex_radius_a: number, shape_a: types.Shape & T, convex_radius_b: number, shape_b: types.Shape & U): (Vector3?, number?, Vector3?)
+local function shapecast<T, U>(cframe_a: CFrame, direction: Vector3, shape_a: T & types.Shape, cframe_b: CFrame, shape_b: U & types.Shape, in_tolerance: number): (Vector3?, number?, Vector3?)
+	local local_start = tos(cframe_b, cframe_a)
+	local local_direction = vtos(cframe_b, direction)
+	
+	local convex_radius_a = shape_a.convex_radius
+	local convex_radius_b = shape_b.convex_radius
+	
 	local tolerance_sq = in_tolerance * in_tolerance
 	local sum_convex_radius = convex_radius_a + convex_radius_b
 
@@ -602,19 +612,19 @@ local function shapecast<T, U>(start: CFrame, direction: Vector3, in_tolerance: 
 
 	local lambda = 0
 	local x = V_ZERO
-	local v = -support_b(shape_b, V_ZERO) + ptws(start, support_a(shape_a, V_ZERO))
+	local v = -support_b(shape_b, V_ZERO) + ptws(local_start, support_a(shape_a, V_ZERO))
 	local v_len_sq = HUGE
 	local allow_restart = false
 
 	local prev_v = V_ZERO
 	while true do
-		local p = ptws(start, support_a(shape_a, vtos(start, -v)))
+		local p = ptws(local_start, support_a(shape_a, vtos(local_start, -v)))
 		local q = support_b(shape_b, v)
 		local w = x - (q - p)
 
 		local v_dot_w = vector.dot(v :: any, w :: any) - sum_convex_radius * vector.magnitude(v :: any)
 		if v_dot_w > 0 then
-			local v_dot_r = vector.dot(v :: any, direction :: any)
+			local v_dot_r = vector.dot(v :: any, local_direction :: any)
 			if v_dot_r >= -1e-18 then
 				return nil, nil, nil
 			end
@@ -631,7 +641,7 @@ local function shapecast<T, U>(start: CFrame, direction: Vector3, in_tolerance: 
 				return nil, nil, nil
 			end
 
-			x = lambda * direction
+			x = lambda * local_direction
 			v_len_sq = HUGE
 			local _tolerance = (in_tolerance + sum_convex_radius)
 			tolerance_sq = _tolerance * _tolerance
@@ -692,7 +702,28 @@ local function shapecast<T, U>(start: CFrame, direction: Vector3, in_tolerance: 
 	end
 
 	local out_normal = sum_convex_radius > 0 and normalized_v or vector.dot(prev_v :: any, prev_v :: any) < FLT_EPSILON and V_ZERO or vector.normalize(prev_v :: any)
-	return point, lambda * vector.magnitude(direction :: any), out_normal
+	local world_normal = vtws(cframe_b, out_normal)
+	local world_hit = ptws(cframe_b, point)
+	
+	return world_hit, lambda * vector.magnitude(local_direction :: any), world_normal
+end
+
+local function calculate_point_a_and_b(): (Vector3, Vector3)
+	if m_num_points == 1 then
+		return m_p[1], m_q[1]
+	elseif m_num_points == 2 then
+		local u, v = get_barycentric_coordinates_2d(m_y[1], m_y[2])
+		local point_a = u * m_p[1] + v * m_p[2]
+		local point_b = u * m_q[1] + v * m_q[2]
+		return point_a, point_b
+	elseif m_num_points == 3 then
+		local u, v, w = get_barycentric_coordinates_3d(m_y[1], m_y[2], m_y[3])
+		local point_a = u * m_p[1] + v * m_p[2] + w * m_p[3]
+		local point_b = u * m_q[1] + v * m_q[2] + w * m_q[3]
+		return point_a, point_b
+	else
+		return V_ZERO, V_ZERO
+	end
 end
 
 return {

@@ -14,37 +14,43 @@ local UP = Vector3.yAxis
 local RIGHT = Vector3.xAxis
 local LOOK = -Vector3.zAxis
 
-local function create_box(size: Vector3): types.BoxShape
+local DEFAULT_CONVEX_RADIUS = .05
+
+local function create_box(size: Vector3, convex_radius: number?): types.BoxShape
 	return {
 		type = shape_map.BOX,
-		half_extents = size / 2
+		half_extents = size / 2,
+		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
 	}	
 end
 
-local function create_sphere(radius: number): types.SphereShape
+local function create_sphere(radius: number, convex_radius: number?): types.SphereShape
 	return {
 		type = shape_map.SPHERE,
-		radius = radius
+		radius = radius,
+		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
 	}
 end
 
-local function create_capsule(radius: number, height: number): types.CapsuleShape
+local function create_capsule(radius: number, height: number, convex_radius: number?): types.CapsuleShape
 	return {
 		type = shape_map.CAPSULE,
 		radius = radius,
-		half_height = height / 2
+		half_height = height / 2,
+		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
 	}
 end
 
-local function create_cylinder(radius: number, height: number): types.CylinderShape
+local function create_cylinder(radius: number, height: number, convex_radius: number?): types.CylinderShape
 	return {
 		type = shape_map.CYLINDER,
 		radius = radius,
-		half_height = height / 2
+		half_height = height / 2,
+		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
 	}
 end
 
-local function create_wedge(size: Vector3): types.WedgeShape
+local function create_wedge(size: Vector3, convex_radius: number?): types.WedgeShape
 	local half_extents = size / 2	
 
 	local sr = half_extents.X * RIGHT
@@ -58,11 +64,12 @@ local function create_wedge(size: Vector3): types.WedgeShape
 	return {
 		type = shape_map.WEDGE,
 		vertices = {v1, v2, v3},
-		half_extents = half_extents
+		half_extents = half_extents,
+		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
 	}
 end
 
-local function create_corner_wedge(size: Vector3): types.CornerWedgeShape
+local function create_corner_wedge(size: Vector3, convex_radius: number?): types.CornerWedgeShape
 	local half_extents = size / 2	
 
 	local sr = half_extents.X * RIGHT
@@ -78,42 +85,44 @@ local function create_corner_wedge(size: Vector3): types.CornerWedgeShape
 	return {
 		type = shape_map.CORNER_WEDGE,
 		vertices = {v1, v2, v3, v4, v5},
-		half_extents = half_extents
+		half_extents = half_extents,
+		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
 	}
 end
 
-local function create_mesh(part: MeshPart): types.MeshShape
+local function create_mesh(part: MeshPart, convex_radius: number?): types.MeshShape
 	return {
 		type = shape_map.MESH,
-		part = part
+		part = part,
+		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
 	}
 end
 
-local function create_from_part(part: BasePart): types.Shape
+local function create_from_part(part: BasePart, convex_radius: number?): types.Shape
 	if part:IsA("MeshPart") then
-		return create_mesh(part)
+		return create_mesh(part, convex_radius)
 	elseif part:IsA("Part") then
 		local shape = (part :: Part).Shape
 		local size = part.Size
 
 		if shape == Enum.PartType.Block then
-			return create_box(size)
+			return create_box(size, convex_radius)
 		elseif shape == Enum.PartType.Ball then
 			local sx, sy, sz = size.X, size.Y, size.Z
 			if sx ~= sy or sx ~= sz or sy ~= sz then
 				error("sphere does not have a consistent size")
 			end
-			return create_sphere(sx/2)
+			return create_sphere(sx/2, convex_radius)
 		elseif shape == Enum.PartType.Cylinder then
 			local sx, sy, sz = size.X, size.Y, size.Z
 			if sy ~= sz then
 				error("cylinder does not have a consistent radius")
 			end
-			return create_cylinder(sy/2, sx)
+			return create_cylinder(sy/2, sx, convex_radius)
 		elseif shape == Enum.PartType.Wedge then
-			return create_wedge(size)
+			return create_wedge(size, convex_radius)
 		elseif shape == Enum.PartType.CornerWedge then
-			return create_corner_wedge(size)
+			return create_corner_wedge(size, convex_radius)
 		else
 			error("just so the type engine shuts up")
 		end
