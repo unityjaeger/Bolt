@@ -29,8 +29,7 @@ type Tree = {
 	query_ray: (tree: Tree, ray_origin: Vector3, ray_direction: Vector3) -> {number},
 	query_shape: (tree: Tree, cframe: CFrame, shape: types.Shape) -> {number},
 	query_shapecast: (tree: Tree, shape: types.Shape, origin: CFrame, direction: Vector3) -> {number},
-	full_rebuild: (tree: Tree) -> number,
-	
+	full_rebuild: (tree: Tree) -> number
 }
 
 type DynamicTree = Tree & {
@@ -61,10 +60,8 @@ local PLANE_COUNT = BIN_COUNT - 1
 
 local NULL = 0
 
---vector components are 32 bit, using HUGE (2^52) would mess with the SAH function and make it prefer the else branch
-local HUGE_VECTOR = vector.one * 2^24
---math.huge is preferred here because surface areas can get very large
 local TRUE_HUGE = math.huge
+local HUGE_VECTOR = vector.one * 2^32
 
 local query_traversal_stack = table.create(128) :: {number}
 
@@ -74,12 +71,12 @@ end
 
 local function aabb_sah(a_min: vector, a_max: vector): number
 	local d = a_max - a_min
-	return 2 * (d.x*d.y + d.y*d.z + d.z*d.x)
+	return d.x*d.y + d.y*d.z + d.z*d.x
 end
 
 local function union_sah(a_min: vector, a_max: vector, b_min: vector, b_max: vector): number
 	local d = vector.max(a_max, b_max) - vector.min(a_min, b_min)
-	return 2 * (d.x*d.y + d.y*d.z + d.z*d.x)
+	return d.x*d.y + d.y*d.z + d.z*d.x
 end
 
 local function aabb_contains(a_min: vector, a_max: vector, b_min: vector, b_max: vector): boolean
@@ -535,7 +532,7 @@ local function refit(dyn_tree: DynamicTree, index: number, should_rotate: boolea
 		local node = nodes[index]
 		local child1 = nodes[node.child1]
 		local child2 = nodes[node.child2]
-		
+
 		local prev_size = node.aabb_max - node.aabb_min
 		node.aabb_min, node.aabb_max = aabb_union(child1.aabb_min, child1.aabb_max, child2.aabb_min, child2.aabb_max)
 		local new_size = node.aabb_max - node.aabb_min
@@ -573,7 +570,7 @@ local function insert_leaf(dyn_tree: DynamicTree, leaf: number)
 	new_parent.child2 = leaf
 	new_parent.aabb_min, new_parent.aabb_max = aabb_union(sibling.aabb_min, sibling.aabb_max, new_leaf.aabb_min, new_leaf.aabb_max)
 	new_parent.height = sibling.height + 1
-	
+
 	if old_parent == NULL then
 		dyn_tree.root = new_parent_index
 	else
@@ -628,7 +625,7 @@ local function public_insert(dyn_tree: DynamicTree, id: number, cf: CFrame, shap
 	if leaf_map[id] then
 		error("id already registered")
 	end
-	
+
 	local min, max = shape_aabb(cf, shape)
 
 	local index = alloc(dyn_tree)
@@ -857,7 +854,7 @@ local function partition_sah(indices: {number}, bin_indices: {number}, boxes_min
 	end
 
 	inv_d = inv_d > 0 and 1 / inv_d or 0
-	
+
 	local min_c = axis_index == 0 and centroid_min.x or axis_index == 1 and centroid_min.y or centroid_min.z
 	for i = start, start + count - 1 do
 		local c = (boxes_min[i] + boxes_max[i]) / 2
@@ -866,7 +863,7 @@ local function partition_sah(indices: {number}, bin_indices: {number}, boxes_min
 		bin_index = math.clamp(bin_index, 1, BIN_COUNT)
 		bin_indices[i] = bin_index
 		bins_count[bin_index] += 1
-		bins_min[bin_index], bins_max[bin_index] = aabb_union(bins_min[bin_index], boxes_min[i], bins_max[bin_index], boxes_max[i])
+		bins_min[bin_index], bins_max[bin_index] = aabb_union(bins_min[bin_index], bins_max[bin_index], boxes_min[i], boxes_max[i])
 	end
 
 	planes_left_count[1] = bins_count[1]
@@ -888,13 +885,13 @@ local function partition_sah(indices: {number}, bin_indices: {number}, boxes_min
 	local min_cost = TRUE_HUGE
 	local best_plane = 0
 	for i = 1, PLANE_COUNT do
-		local left_area = aabb_sah(planes_left_aabb_min[i], planes_left_aabb_max[i])
-		local right_area = aabb_sah(planes_right_aabb_min[i], planes_right_aabb_max[i])
 		local left_count = planes_left_count[i]
 		local right_count = planes_right_count[i]
+		local left_area = aabb_sah(planes_left_aabb_min[i], planes_left_aabb_max[i])
+		local right_area = aabb_sah(planes_right_aabb_min[i], planes_right_aabb_max[i])
 
 		local cost = left_count * left_area + right_count * right_area
-		
+
 		if cost < min_cost then
 			best_plane = i
 			min_cost = cost
@@ -907,11 +904,11 @@ local function partition_sah(indices: {number}, bin_indices: {number}, boxes_min
 		while i1 < i2 and bin_indices[i1] <= best_plane do
 			i1 += 1
 		end
-		
+
 		while i1 < i2 and bin_indices[i2 - 1] > best_plane do
 			i2 -= 1
 		end
-		
+
 		if i1 < i2 then
 			local i2_sub_1 = i2 - 1
 			indices[i1], indices[i2_sub_1] = indices[i2_sub_1], indices[i1]
@@ -932,9 +929,9 @@ end
 
 local function build_tree(tree: Tree, leaf_count: number, leaf_indices: {number}, leaf_boxes_min: {vector}, leaf_boxes_max: {vector}): number
 	local nodes = tree.nodes
-	
+
 	local bin_indices = table.create(leaf_count) :: {number}
-	
+
 	if leaf_count == 1 then
 		nodes[leaf_indices[1]].parent = NULL
 		return leaf_indices[1]
@@ -958,7 +955,7 @@ local function build_tree(tree: Tree, leaf_count: number, leaf_indices: {number}
 
 			local parent_index = top - 1
 			local parent_node = nodes[node_indices[parent_index]]
-			
+
 			if child_counts[parent_index] == 0 then
 				parent_node.child1 = node_indices[item_index]
 			else
@@ -1149,7 +1146,7 @@ local function public_static_insert(tree: StaticTree, id: number, cf: CFrame, sh
 	if leaf_map[id] then
 		error("id already registered")
 	end
-	
+
 	local min, max = shape_aabb(cf, shape)
 
 	local index = alloc(tree)
@@ -1195,7 +1192,7 @@ local function public_static_remove(tree: StaticTree, id: number)
 
 	leaf_map[id] = nil
 	tree.proxy_count -= 1
-	
+
 	local nodes = tree.nodes
 	if index == tree.root then
 		tree.root = NULL
@@ -1225,7 +1222,7 @@ local function public_static_remove(tree: StaticTree, id: number)
 
 		free(tree, parent_index)
 	end
-	
+
 	free(tree, index)
 end
 
