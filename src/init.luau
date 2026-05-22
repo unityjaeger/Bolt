@@ -90,7 +90,7 @@ local function create_corner_wedge(size: Vector3, convex_radius: number?): types
 	}
 end
 
-local function create_mesh(part: MeshPart, convex_radius: number?): types.MeshShape
+local function create_mesh(part: MeshPart | UnionOperation, convex_radius: number?): types.MeshShape
 	return {
 		type = shape_map.MESH,
 		part = part,
@@ -99,7 +99,7 @@ local function create_mesh(part: MeshPart, convex_radius: number?): types.MeshSh
 end
 
 local function create_from_part(part: BasePart, convex_radius: number?): types.Shape
-	if part:IsA("MeshPart") then
+	if part:IsA("MeshPart") or part:IsA("UnionOperation") then
 		return create_mesh(part, convex_radius)
 	elseif part:IsA("Part") then
 		local shape = (part :: Part).Shape
@@ -170,6 +170,6 @@ return {
 	
 	mpr = {
 		intersects = mpr.intersects,
-		is_seperated = mpr.is_seperated
+		is_separated = mpr.is_separated
 	}
 }

@@ -192,7 +192,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 	end
 end
 
-local function is_seperated<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cframe_b: CFrame, shape_b: U & types.Shape, cached_normal: Vector3): boolean
+local function is_separated<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cframe_b: CFrame, shape_b: U & types.Shape, cached_normal: Vector3): boolean
 	local transform_b_in_a = tos(cframe_a, cframe_b)
 	local normal_in_a = vtos(cframe_a, cached_normal)
 	
@@ -209,5 +209,5 @@ end
 
 return {
 	intersects = intersects,
-	is_seperated = is_seperated
+	is_separated = is_separated
 }

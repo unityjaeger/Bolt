@@ -32,7 +32,7 @@ export type CornerWedgeShape = Shape & {
 }
 
 export type MeshShape = Shape & {
-	part: MeshPart
+	part: MeshPart | UnionOperation
 }
 
 export type Support<T = Shape> = (shape: T, direction: Vector3) -> Vector3
