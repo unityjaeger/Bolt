@@ -6,7 +6,7 @@ description: Introduction to the library.
 # Installation
 You can download Bolt through either wally or the .rbxm in the [latest release](https://github.com/unityjaeger/Bolt/releases/latest)
 ```
-bolt = "unityjaeger/bolt@0.3.3"
+bolt = "unityjaeger/bolt@0.4.0"
 ```
 
 # Features
