@@ -725,9 +725,9 @@ local function public_query_aabb(tree: Tree, min: Vector3, max: Vector3): {numbe
 				table.insert(out, node.id)
 			else
 				top += 1
-				query_traversal_stack[top + 1] = node.child1
+				query_traversal_stack[top] = node.child1
 				top += 1
-				query_traversal_stack[top + 2] = node.child2
+				query_traversal_stack[top] = node.child2
 			end
 		end
 	end
