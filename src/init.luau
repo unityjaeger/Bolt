@@ -16,6 +16,16 @@ local LOOK = -Vector3.zAxis
 
 local DEFAULT_CONVEX_RADIUS = .05
 
+export type Shape = types.Shape
+export type BoxShape = types.BoxShape
+export type SphereShape = types.SphereShape
+export type CapsuleShape = types.CapsuleShape
+export type CylinderShape = types.CylinderShape
+export type WedgeShape = types.WedgeShape
+export type CornerWedgeShape = types.CornerWedgeShape
+export type MeshShape = types.MeshShape
+export type Support<T = Shape> = types.Support<T>
+
 local function create_box(size: Vector3, convex_radius: number?): types.BoxShape
 	return {
 		type = shape_map.BOX,
