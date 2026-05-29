@@ -8,6 +8,8 @@ Minkowski Portal Refinement is comparable to GJK, as it also relies on support f
 
 In Bolt specifically, MPR performs both an intersection test and the collision information extraction.
 
+MPR is great for objects that don't have flat faces with multiple contact points, it can handle the remaining shape pairs that SAT doesn't cover just fine.
+
 # Usage
 As MPR does not provide the shortest distance, only intersection tests can be done with MPR.
 ```luau

@@ -8,6 +8,8 @@ The seperating axis theorem states that if you can draw a single line (an axis) 
 
 This algorithm is mainly used when the objects have a low number of faces, as it requires a bunch of extra effort and processing power to support objects which aren't composed flat planes.
 
+It provides very accurate collision information for the shapes it supports, so SAT should be used when possible.
+
 Bolt supports boxes, wedges and corner wedges through SAT.
 
 # Usage
