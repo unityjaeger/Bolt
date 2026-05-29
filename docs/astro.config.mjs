@@ -20,6 +20,7 @@ export default defineConfig({
 						{ label: "Shapes", slug: "guides/shapes" },
 						{ label: "Special-Cased", slug: "guides/special_cased" },
 						{ label: "GJK", slug: "guides/gjk" },
+						{ label: "SAT", slug: "guides/sat" },
 						{ label: "MPR", slug: "guides/mpr" },
 						{ label: "AABB Tree", slug: "guides/aabb_tree" }
 					],
