@@ -23,11 +23,18 @@ export type CylinderShape = Shape & {
 
 export type WedgeShape = Shape & {
 	half_extents: Vector3,
+	local_slope: Vector3,
+	local_edge: Vector3,
 	vertices: {Vector3}
 }
 
 export type CornerWedgeShape = Shape & {
 	half_extents: Vector3,
+	local_slope1: Vector3,
+	local_slope2: Vector3,
+	local_edge1: Vector3,
+	local_edge2: Vector3,
+	local_edge3: Vector3,
 	vertices: {Vector3}
 }
 

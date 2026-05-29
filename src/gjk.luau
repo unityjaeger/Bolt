@@ -434,7 +434,7 @@ end
 local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, cframe: CFrame, shape: T & types.Shape, in_tolerance: number): (Vector3?, number?, Vector3?)
 	local local_origin = ptos(cframe, ray_origin)
 	local local_direction = vtos(cframe, ray_direction)
-	
+
 	local tolerance_sq = in_tolerance * in_tolerance
 
 	local support = support_map[shape.type]
@@ -508,7 +508,7 @@ local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, cframe: C
 			break
 		end
 	end
-	
+
 	out_normal = out_normal and vector.normalize(out_normal :: any) or V_ZERO
 	local world_normal = vtws(cframe, out_normal :: any)
 	local world_point = ptws(cframe, x)
@@ -519,7 +519,7 @@ end
 local function shapecast_simple<T, U>(cframe_a: CFrame, direction: Vector3, shape_a: T & types.Shape, cframe_b: CFrame, shape_b: U & types.Shape, in_tolerance: number): (boolean, number?)
 	local local_start = tos(cframe_b, cframe_a)
 	local local_direction = vtos(cframe_b, direction)
-	
+
 	local support_a = support_map[shape_a.type]
 	local support_b = support_map[shape_b.type]
 
@@ -598,10 +598,10 @@ end
 local function shapecast<T, U>(cframe_a: CFrame, direction: Vector3, shape_a: T & types.Shape, cframe_b: CFrame, shape_b: U & types.Shape, in_tolerance: number): (Vector3?, number?, Vector3?)
 	local local_start = tos(cframe_b, cframe_a)
 	local local_direction = vtos(cframe_b, direction)
-	
+
 	local convex_radius_a = shape_a.convex_radius
 	local convex_radius_b = shape_b.convex_radius
-	
+
 	local tolerance_sq = in_tolerance * in_tolerance
 	local sum_convex_radius = convex_radius_a + convex_radius_b
 
@@ -704,26 +704,8 @@ local function shapecast<T, U>(cframe_a: CFrame, direction: Vector3, shape_a: T 
 	local out_normal = sum_convex_radius > 0 and normalized_v or vector.dot(prev_v :: any, prev_v :: any) < FLT_EPSILON and V_ZERO or vector.normalize(prev_v :: any)
 	local world_normal = vtws(cframe_b, out_normal)
 	local world_hit = ptws(cframe_b, point)
-	
-	return world_hit, lambda * vector.magnitude(local_direction :: any), world_normal
-end
 
-local function calculate_point_a_and_b(): (Vector3, Vector3)
-	if m_num_points == 1 then
-		return m_p[1], m_q[1]
-	elseif m_num_points == 2 then
-		local u, v = get_barycentric_coordinates_2d(m_y[1], m_y[2])
-		local point_a = u * m_p[1] + v * m_p[2]
-		local point_b = u * m_q[1] + v * m_q[2]
-		return point_a, point_b
-	elseif m_num_points == 3 then
-		local u, v, w = get_barycentric_coordinates_3d(m_y[1], m_y[2], m_y[3])
-		local point_a = u * m_p[1] + v * m_p[2] + w * m_p[3]
-		local point_b = u * m_q[1] + v * m_q[2] + w * m_q[3]
-		return point_a, point_b
-	else
-		return V_ZERO, V_ZERO
-	end
+	return world_hit, lambda * vector.magnitude(local_direction :: any), world_normal
 end
 
 return {

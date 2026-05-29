@@ -9,10 +9,11 @@ local ray = require("@self/ray")
 local gjk = require("@self/gjk")
 local aabb_tree = require("@self/aabb_tree")
 local mpr = require("@self/mpr")
+local sat = require("@self/sat")
 
 local UP = Vector3.yAxis
 local RIGHT = Vector3.xAxis
-local LOOK = -Vector3.zAxis
+local LOOK = Vector3.zAxis
 
 local DEFAULT_CONVEX_RADIUS = .05
 
@@ -68,18 +69,22 @@ end
 
 local function create_wedge(size: Vector3, convex_radius: number?): types.WedgeShape
 	local half_extents = size / 2	
-
-	local sr = half_extents.X * RIGHT
-	local su = half_extents.Y * UP
-	local sl = half_extents.Z * LOOK
+	
+	local hx, hy, hz = half_extents.X, half_extents.Y, half_extents.Z
+	
+	local sr = hx * RIGHT
+	local su = hy * UP
+	local sl = hz * LOOK
 
 	local v1 = sr + sl - su
 	local v2 = sr - sl - su
-	local v3 = sr - sl + su
+	local v3 = sr + sl + su
 
 	return {
 		type = shape_map.WEDGE,
 		vertices = {v1, v2, v3},
+		local_slope = vector.normalize(vector.create(0, hz, -hy)) :: any,
+		local_edge = vector.normalize(vector.create(0, hy, hz)) :: any,
 		half_extents = half_extents,
 		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
 	}
@@ -87,20 +92,27 @@ end
 
 local function create_corner_wedge(size: Vector3, convex_radius: number?): types.CornerWedgeShape
 	local half_extents = size / 2	
+	
+	local hx, hy, hz = half_extents.X, half_extents.Y, half_extents.Z
 
-	local sr = half_extents.X * RIGHT
-	local su = half_extents.Y * UP
-	local sl = half_extents.Z * LOOK
+	local sr = hx * RIGHT
+	local su = hy * UP
+	local sl = hz * LOOK
 
 	local v1 = sr + sl - su
 	local v2 = sr - sl - su
-	local v3 = sr + sl + su
+	local v3 = sr - sl + su
 	local v4 = -sr - sl - su
 	local v5 = -sr + sl - su
 
 	return {
 		type = shape_map.CORNER_WEDGE,
 		vertices = {v1, v2, v3, v4, v5},
+		local_slope1 = vector.normalize(vector.create(0, hz, hy)) :: any,
+		local_slope2 = vector.normalize(vector.create(-hy, hx, 0)) :: any,
+		local_edge1 = vector.normalize(vector.create(0, hy, -hz)) :: any,
+		local_edge2 = vector.normalize(vector.create(hx, hy, 0)) :: any,
+		local_edge3 = vector.normalize(vector.create(hx, hy, -hz)) :: any,
 		half_extents = half_extents,
 		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
 	}
@@ -183,9 +195,18 @@ return {
 		new = aabb_tree.new_dynamic,
 		new_static = aabb_tree.new_static
 	},
-	
+
 	mpr = {
 		intersects = mpr.intersects,
 		is_separated = mpr.is_separated
+	},
+	
+	sat = {
+		box_box = sat.box_box,
+		box_wedge = sat.box_wedge,
+		wedge_wedge = sat.wedge_wedge,
+		wedge_corner_wedge = sat.wedge_corner_wedge,
+		box_corner_wedge = sat.box_corner_wedge,
+		corner_wedge_corner_wedge = sat.corner_wedge_corner_wedge
 	}
 }
