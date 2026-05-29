@@ -26,6 +26,12 @@ export type CornerWedgeShape = types.CornerWedgeShape
 export type MeshShape = types.MeshShape
 export type Support<T = Shape> = types.Support<T>
 
+export type TreeNode = types.TreeNode
+export type Tree = types.Tree
+export type DynamicTree = types.DynamicTree
+export type StaticTree = types.StaticTree
+export type DynamicTreeConfig = types.DynamicTreeConfig
+
 local function create_box(size: Vector3, convex_radius: number?): types.BoxShape
 	return {
 		type = shape_map.BOX,

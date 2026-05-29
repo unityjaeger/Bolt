@@ -5,52 +5,11 @@
 local types = require("./types")
 local shape_map = require("./shape_map")
 
-type Node = {
-	aabb_min: vector,
-	aabb_max: vector,
-	parent: number,
-	child1: number,
-	child2: number,
-	height: number,
-	enlarged: boolean?,
-	id: number,
-	cf: CFrame,
-	shape: types.Shape
-}
-
-type Tree = {
-	root: number,
-	nodes: {Node},
-	free_list: number,
-	leaf_map: {number},
-	proxy_count: number,
-	base_cost_ratio: number?,
-	query_aabb: (tree: Tree, min: Vector3, max: Vector3) -> {number},
-	query_ray: (tree: Tree, ray_origin: Vector3, ray_direction: Vector3) -> {number},
-	query_shape: (tree: Tree, cframe: CFrame, shape: types.Shape) -> {number},
-	query_shapecast: (tree: Tree, shape: types.Shape, origin: CFrame, direction: Vector3) -> {number},
-	full_rebuild: (tree: Tree) -> number
-}
-
-type DynamicTree = Tree & {
-	padding: vector,
-	insert: (dyn_tree: DynamicTree, id: number, cf: CFrame, shape: types.Shape) -> (),
-	remove: (dyn_tree: DynamicTree, id: number) -> (),
-	move: (dyn_tree: DynamicTree, id: number, cf: CFrame) -> (),
-	resize: (dyn_tree: DynamicTree, id: number, shape: types.Shape) -> (),
-	clear: (dyn_tree: DynamicTree) -> (),
-	should_rebuild: (dyn_tree: DynamicTree) -> boolean,
-	partial_rebuild: (dyn_tree: DynamicTree) -> number
-}
-
-type StaticTree = Tree & {
-	insert: (tree: StaticTree, id: number, cf: CFrame, shape: types.Shape) -> (),
-	remove: (tree: StaticTree, id: number) -> ()
-}
-
-type Config = {
-	aabb_padding: number
-}
+type Node = types.TreeNode
+type Tree = types.Tree
+type DynamicTree = types.DynamicTree
+type StaticTree = types.StaticTree
+type Config = types.DynamicTreeConfig
 
 local INITIAL_REBUILD_THRESHOLD = 128
 local REBUILD_RATIO_THRESHOLD = 1.5
