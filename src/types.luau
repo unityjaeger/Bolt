@@ -11,6 +11,10 @@ export type SphereShape = Shape & {
 	radius: number
 }
 
+export type EllipsoidShape = Shape & {
+	half_extents: Vector3
+}
+
 export type CapsuleShape = Shape & {
 	radius: number,
 	half_height: number
@@ -38,8 +42,21 @@ export type CornerWedgeShape = Shape & {
 	vertices: {Vector3}
 }
 
+export type Hull = {
+	offset: Vector3,
+	vertices: {Vector3},
+	adjacency: {{number}}
+}
+
 export type MeshShape = Shape & {
-	part: MeshPart | UnionOperation
+	half_extents: Vector3,
+	original_half_extents: Vector3,
+	hulls: {HullShape},
+	local_tree: StaticTree
+}
+
+export type HullShape = Shape & Hull & {
+	scale: Vector3
 }
 
 export type Support<T = Shape> = (shape: T, direction: Vector3) -> Vector3
@@ -64,6 +81,7 @@ export type Tree = {
 	leaf_map: {number},
 	proxy_count: number,
 	base_cost_ratio: number?,
+	clear: (dyn_tree: Tree) -> (),
 	query_aabb: (tree: Tree, min: Vector3, max: Vector3) -> {number},
 	query_ray: (tree: Tree, ray_origin: Vector3, ray_direction: Vector3) -> {number},
 	query_shape: (tree: Tree, cframe: CFrame, shape: Shape) -> {number},
@@ -77,7 +95,6 @@ export type DynamicTree = Tree & {
 	remove: (dyn_tree: DynamicTree, id: number) -> (),
 	move: (dyn_tree: DynamicTree, id: number, cf: CFrame) -> (),
 	resize: (dyn_tree: DynamicTree, id: number, shape: Shape) -> (),
-	clear: (dyn_tree: DynamicTree) -> (),
 	should_rebuild: (dyn_tree: DynamicTree) -> boolean,
 	partial_rebuild: (dyn_tree: DynamicTree) -> number
 }

@@ -7,6 +7,7 @@ return {
 	[shape_map.CYLINDER] = supports.cylinder,
 	[shape_map.WEDGE] = supports.wedge,
 	[shape_map.CORNER_WEDGE] = supports.corner_wedge,
-	[shape_map.MESH] = supports.mesh,
-	[shape_map.CAPSULE] = supports.capsule
+	[shape_map.HULL] = supports.hull,
+	[shape_map.CAPSULE] = supports.capsule,
+	[shape_map.ELLIPSOID] = supports.ellipsoid
 }

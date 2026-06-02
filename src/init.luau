@@ -10,6 +10,7 @@ local gjk = require("@self/gjk")
 local aabb_tree = require("@self/aabb_tree")
 local mpr = require("@self/mpr")
 local sat = require("@self/sat")
+local dispatch = require("@self/dispatch")
 
 local UP = Vector3.yAxis
 local RIGHT = Vector3.xAxis
@@ -25,6 +26,8 @@ export type CylinderShape = types.CylinderShape
 export type WedgeShape = types.WedgeShape
 export type CornerWedgeShape = types.CornerWedgeShape
 export type MeshShape = types.MeshShape
+export type Hull = types.Hull
+export type HullShape = types.HullShape
 export type Support<T = Shape> = types.Support<T>
 
 export type TreeNode = types.TreeNode
@@ -45,6 +48,14 @@ local function create_sphere(radius: number, convex_radius: number?): types.Sphe
 	return {
 		type = shape_map.SPHERE,
 		radius = radius,
+		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
+	}
+end
+
+local function create_ellipsoid(size: Vector3, convex_radius: number?): types.EllipsoidShape
+	return {
+		type = shape_map.ELLIPSOID,
+		half_extents = size / 2,
 		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
 	}
 end
@@ -118,17 +129,61 @@ local function create_corner_wedge(size: Vector3, convex_radius: number?): types
 	}
 end
 
-local function create_mesh(part: MeshPart | UnionOperation, convex_radius: number?): types.MeshShape
+local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vector3, convex_radius: number?): types.MeshShape
+	local hull_shapes = {}
+	
+	local scale = size / mesh_info.size
+	
+	for i, v in mesh_info.hulls do
+		hull_shapes[i] = {
+			type = shape_map.HULL,
+			vertices = v.vertices,
+			offset = v.offset,
+			adjacency = v.adjacency,
+			scale = scale,
+			convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
+		}
+	end
+	
+	local local_tree = aabb_tree.new_static()
+	for i, hull in hull_shapes do
+		local_tree:insert(i, CFrame.new(hull.offset), hull)
+	end
+	local_tree:full_rebuild()
+	
 	return {
 		type = shape_map.MESH,
-		part = part,
+		hulls = hull_shapes,
+		local_tree = local_tree,
+		half_extents = size / 2,
+		original_half_extents = mesh_info.size / 2,
 		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
 	}
 end
 
+local function resize_mesh(mesh: MeshShape, size: Vector3)
+	local hulls = mesh.hulls
+	local local_tree = mesh.local_tree
+	
+	local new_half_extents = size / 2
+	local scale = new_half_extents / mesh.original_half_extents
+	
+	for _, hull in hulls do
+		hull.scale = scale
+	end
+	
+	mesh.half_extents = size / 2
+	
+	local_tree:clear()
+	for i, hull in hulls do
+		local_tree:insert(i, CFrame.new(hull.offset), hull)
+	end
+	local_tree:full_rebuild()
+end
+
 local function create_from_part(part: BasePart, convex_radius: number?): types.Shape
 	if part:IsA("MeshPart") or part:IsA("UnionOperation") then
-		return create_mesh(part, convex_radius)
+		error("meshes and unions cannot be created from parts")
 	elseif part:IsA("Part") then
 		local shape = (part :: Part).Shape
 		local size = part.Size
@@ -138,7 +193,7 @@ local function create_from_part(part: BasePart, convex_radius: number?): types.S
 		elseif shape == Enum.PartType.Ball then
 			local sx, sy, sz = size.X, size.Y, size.Z
 			if sx ~= sy or sx ~= sz or sy ~= sz then
-				error("sphere does not have a consistent size")
+				return create_ellipsoid(size/2, convex_radius)
 			end
 			return create_sphere(sx/2, convex_radius)
 		elseif shape == Enum.PartType.Cylinder then
@@ -168,6 +223,8 @@ return {
 	create_corner_wedge = create_corner_wedge,
 	create_mesh = create_mesh,
 	create_from_part = create_from_part,
+	
+	resize_mesh = resize_mesh,
 
 	collision = {
 		box_box = box.box_box,
@@ -208,5 +265,18 @@ return {
 		wedge_corner_wedge = sat.wedge_corner_wedge,
 		box_corner_wedge = sat.box_corner_wedge,
 		corner_wedge_corner_wedge = sat.corner_wedge_corner_wedge
+	},
+	
+	dispatch = {
+		gjk = {
+			intersects = dispatch.dispatch_gjk_intersects,
+			raycast = dispatch.dispatch_gjk_raycast,
+			shapecast_simple = dispatch.dispatch_gjk_shapecast_simple,
+			shapecast = dispatch.dispatch_gjk_shapecast
+		},
+		mpr = {
+			mesh_primitive = dispatch.dispatch_mpr_mesh_primitive,
+			mesh_mesh = dispatch.dispatch_mpr_mesh_mesh
+		}
 	}
 }

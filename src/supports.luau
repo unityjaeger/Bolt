@@ -33,12 +33,12 @@ local function capsule(shape: types.CapsuleShape, direction: Vector3): Vector3
 
 	local proj = vector.dot(direction :: any, V_X :: any)
 	local pole_offset = (proj >= 0 and half_height or -half_height) * V_X
-	
+
 	local mag = vector.magnitude(direction :: any)
 	if mag < FLT_EPSILON then
 		return pole_offset
 	end
-	
+
 	return pole_offset + shape.radius * direction / mag
 end
 
@@ -98,11 +98,43 @@ local function corner_wedge(shape: types.CornerWedgeShape, direction: Vector3): 
 	return verts[best_idx]
 end
 
-local function mesh(shape: types.MeshShape, direction: Vector3): Vector3
-	local part = shape.part
-	return part.CFrame:PointToObjectSpace(
-		part:GetClosestPointOnSurface(direction * HUGE_VECTOR)
-	) :: Vector3
+local function hull(shape: types.HullShape, direction: Vector3): Vector3
+	local verts = shape.vertices
+	local adjacency = shape.adjacency
+	local scale = shape.scale
+	
+	direction /= scale
+	
+	local best_i = 1
+	local best_dot = vector.dot(verts[1] :: any, direction :: any)
+	
+	local improved = true
+	while improved do
+		improved = false
+		for _, i in adjacency[best_i] do
+			local d = vector.dot(verts[i] :: any, direction :: any)
+			if d > best_dot then
+				best_dot = d
+				best_i = i
+				improved = true
+				break
+			end
+		end
+	end
+	
+	return verts[best_i] * scale
+end
+
+local function ellipsoid(shape: types.EllipsoidShape, direction: Vector3): Vector3
+	local half_extents = shape.half_extents
+	local scaled_dir = direction * half_extents
+	local len = vector.magnitude(scaled_dir :: any)
+
+	if len < FLT_EPSILON then
+		return Vector3.new(0, half_extents.Y, 0)
+	end
+
+	return (scaled_dir / len) * half_extents
 end
 
 return {
@@ -111,6 +143,7 @@ return {
 	cylinder = cylinder,
 	wedge = wedge,
 	corner_wedge = corner_wedge,
-	mesh = mesh,
 	capsule = capsule,
+	hull = hull,
+	ellipsoid = ellipsoid
 }

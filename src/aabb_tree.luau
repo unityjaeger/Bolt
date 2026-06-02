@@ -64,7 +64,7 @@ local function ray_aabb(ray_origin: Vector3, ray_inv_dir: Vector3, min: vector, 
 end
 
 local function shape_aabb(cf: CFrame, shape): (vector, vector)
-	if shape.type == shape_map.BOX then
+	if shape.type == shape_map.BOX or shape.type == shape_map.MESH then
 		local half_extents = (shape :: types.BoxShape).half_extents
 		local center = cf.Position
 		local right, up, look = cf.RightVector, cf.UpVector, cf.LookVector
@@ -139,17 +139,23 @@ local function shape_aabb(cf: CFrame, shape): (vector, vector)
 		local maxv = vector.max(v1 :: any, v2 :: any, v3 :: any, v4 :: any, v5 :: any)
 
 		return origin + minv :: any, origin + maxv :: any
-	elseif shape.type == shape_map.MESH then
-		local half_extents = (shape :: types.MeshShape).part.Size / 2
-		local center = cf.Position
-		local right, up, look = cf.RightVector, cf.UpVector, cf.LookVector
-
-		local e = vector.abs(right :: any) * half_extents.X +
-			vector.abs(up :: any) * half_extents.Y +
-			vector.abs(look :: any) * half_extents.Z
-
-		local extent = vector.create(e.x, e.y, e.z)
-		return center - extent :: any, center + extent :: any
+	elseif shape.type == shape_map.HULL then
+		local hull = (shape :: types.HullShape)
+		local vertices = hull.vertices
+		
+		local min = vertices[1]
+		local max = vertices[1]
+		
+		local scale = hull.scale
+		
+		for i = 2, #vertices do
+			local vert = vertices[i]
+			min = vector.min(min :: any, vert :: any)
+			max = vector.max(max :: any, vert :: any)
+		end
+		
+		local pos = hull.offset
+		return (pos + min :: any) * scale, (pos + max :: any) * scale
 	else
 		error("unsupported shape")
 	end
@@ -658,6 +664,7 @@ local function public_clear(tree: Tree)
 	tree.free_list = NULL
 	tree.leaf_map = {}
 	tree.proxy_count = 0
+	tree.base_cost_ratio = nil
 end
 
 local function public_query_aabb(tree: Tree, min: Vector3, max: Vector3): {number}
@@ -1192,6 +1199,7 @@ local function new_static_tree(): StaticTree
 		free_list = NULL,
 		leaf_map = {},
 		proxy_count = 0,
+		clear = public_clear,
 		query_aabb = public_query_aabb,
 		query_shape = public_query_shape,
 		query_ray = public_query_ray,
