@@ -218,6 +218,7 @@ end
 return {
 	create_box = create_box,
 	create_sphere = create_sphere,
+	create_ellipsoid = create_ellipsoid,
 	create_capsule = create_capsule,
 	create_cylinder = create_cylinder,
 	create_wedge = create_wedge,
