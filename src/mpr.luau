@@ -22,7 +22,7 @@ local tos = CF_IDENT.ToObjectSpace
 local function segment_dist(P: Vector3, x0: Vector3, b: Vector3): (number, Vector3)
 	local d = b - x0
 	local a = x0 - P
-	
+
 	local t = -vector.dot(a :: any, d :: any) / vector.dot(d :: any, d :: any)
 	if t <= 0 then
 		return vector.magnitude(x0 - P :: any), x0
@@ -38,13 +38,13 @@ local function tri_dist(P: Vector3, x0: Vector3, B: Vector3, C: Vector3): (numbe
 	local d1 = B - x0
 	local d2 = C - x0
 	local a = x0 - P
-	
+
 	local v = vector.dot(d1 :: any, d1 :: any)
 	local w = vector.dot(d2 :: any, d2 :: any)
 	local p = vector.dot(a :: any, d1 :: any)
 	local q = vector.dot(a :: any, d2 :: any)
 	local r = vector.dot(d1 :: any, d2 :: any)
-	
+
 	local s, t = 0, 0
 	local div = (w * v - r * r)
 	if math.abs(div) < FLT_EPSILON then
@@ -53,7 +53,7 @@ local function tri_dist(P: Vector3, x0: Vector3, B: Vector3, C: Vector3): (numbe
 		s = (q * r - w * p) / div
 		t = (-s * r - q) / w
 	end
-	
+
 	if s >= 0 and s <= 1 and t >= 0 and t <= 1 and t + s <= 1 then
 		d1 *= s
 		d2 *= t
@@ -66,24 +66,24 @@ local function tri_dist(P: Vector3, x0: Vector3, B: Vector3, C: Vector3): (numbe
 			dist = dist2
 			witness = witness2
 		end
-		
+
 		dist2, witness2 = segment_dist(P, B, C)
 		if dist2 < dist then
 			dist = dist2
 			witness = witness2
 		end
-		
+
 		return dist, witness
 	end
 end
 
-local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cframe_b: CFrame, shape_b: U & types.Shape, in_tolerance: number): (boolean, Vector3, number?, Vector3?)
+local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cframe_b: CFrame, shape_b: U & types.Shape, in_tolerance: number): (boolean, Vector3, number?, Vector3?, Vector3?)
 	in_tolerance = math.max(in_tolerance, MAX_TOLERANCE)
 	local transform_b_in_a = tos(cframe_a, cframe_b)
 
 	local support_a = support_map[shape_a.type] :: any
 	local support_b = support_map[shape_b.type]
-	
+
 	local center_b_in_a = transform_b_in_a.Position
 	local v01 = V3_ZERO
 	local v02 = center_b_in_a
@@ -94,43 +94,45 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 	end
 
 	local dir = vector.normalize(-v0 :: any)
-	
+
 	local v11 = support_a(shape_a, dir)
 	local v12 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -dir :: any)))
 	local v1 = v11 - v12
-	
+
 	local dot = vector.dot(v1, dir)
 	if dot < FLT_EPSILON then
-		return false, vtws(cframe_a, -dir :: any), nil, nil
+		return false, vtws(cframe_a, -dir :: any), nil, nil, nil
 	end
-	
+
 	dir = vector.cross(v0 :: any, v1)
 	if vector.dot(dir, dir) < FLT_EPSILON then
 		if vector.magnitude(v1) < FLT_EPSILON then
-			local pointB = ptws(cframe_a, v12)
-			return true, V3_ZERO, 0, pointB
+			local point_a = ptws(cframe_a, v11)
+			local point_b = ptws(cframe_a, v12)
+			return true, V3_ZERO, 0, point_a, point_b
 		else
 			local out_normal = vtws(cframe_a, vector.normalize(v1) :: any)
 			local depth = vector.magnitude(v1)
-			local pointB = ptws(cframe_a, v12)
-			return true, -out_normal, depth, pointB
+			local point_a = ptws(cframe_a, v11)
+			local point_b = ptws(cframe_a, v12)
+			return true, -out_normal, depth, point_a, point_b
 		end
 	end
-	
+
 	dir = vector.normalize(dir)
 	local v21 = support_a(shape_a, dir)
 	local v22 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -dir :: any)))
 	local v2 = v21 - v22
-	
+
 	dot = vector.dot(v2, dir)
 	if dot < FLT_EPSILON then
-		return false, vtws(cframe_a, -dir :: any), nil, nil
+		return false, vtws(cframe_a, -dir :: any), nil, nil, nil
 	end
-	
+
 	local va = v1 - v0
 	local vb = v2 - v0
 	dir = vector.normalize(vector.cross(va, vb))
-	
+
 	dot = vector.dot(dir, v0 :: any)
 	if dot > 0 then
 		v1, v2 = v2, v1
@@ -138,7 +140,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 		v12, v22 = v22, v12
 		dir = -dir
 	end
-	
+
 	local v31, v32, v3
 	while true do
 		v31 = support_a(shape_a, dir)
@@ -146,9 +148,9 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 		v3 = v31 - v32
 		local dot_v3 = vector.dot(v3, dir)
 		if dot_v3 < FLT_EPSILON then
-			return false, vtws(cframe_a, -dir :: any), nil, nil
+			return false, vtws(cframe_a, -dir :: any), nil, nil, nil
 		end
-		
+
 		local cont = false
 		va = vector.cross(v1, v3)
 		dot = vector.dot(va, v0 :: any)
@@ -158,7 +160,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 			v22 = v32
 			cont = true
 		end
-		
+
 		if not cont then
 			va = vector.cross(v3, v2)
 			dot = vector.dot(va, v0 :: any)
@@ -169,7 +171,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 				cont = true
 			end
 		end
-		
+
 		if cont then
 			va = v1 - v0
 			vb = v2 - v0
@@ -178,7 +180,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 			break
 		end
 	end
-	
+
 	local success = false
 	for i = 1, MAX_ITER do
 		local v2v1 = v2 - v1
@@ -189,29 +191,29 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 			success = true
 			break
 		end
-		
+
 		local v41 = support_a(shape_a, dir)
 		local v42 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -dir :: any)))
 		local v4 = v41 - v42
 		dot = vector.dot(v4, dir)
 		if dot <= -FLT_EPSILON then
-			return false, vtws(cframe_a, -dir :: any), nil, nil
+			return false, vtws(cframe_a, -dir :: any), nil, nil, nil
 		end
-		
+
 		local dv1 = vector.dot(v1, dir)
 		local dv2 = vector.dot(v2, dir)
 		local dv3 = vector.dot(v3, dir)
 		local dv4 = vector.dot(v4, dir)
-		
+
 		local dot1 = dv4 - dv1
 		local dot2 = dv4 - dv2
 		local dot3 = dv4 - dv3
-		
+
 		dot1 = math.min(dot1, dot2, dot3)
 		if dot1 <= in_tolerance then
-			return false, vtws(cframe_a, -dir :: any), nil, nil
+			return false, vtws(cframe_a, -dir :: any), nil, nil, nil
 		end
-		
+
 		local v4v0 = vector.cross(v4, v0 :: any)
 		dot = vector.dot(v1, v4v0)
 		if dot > 0 then
@@ -238,21 +240,21 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 			end
 		end
 	end
-	
+
 	if not success then
-		return false, vtws(cframe_a, -dir :: any), nil, nil
+		return false, vtws(cframe_a, -dir :: any), nil, nil, nil
 	end
-	
+
 	local iterations = 0
 	while true do
 		local v2v1 = v2 - v1
 		local v3v1 = v3 - v1
 		dir = vector.normalize(vector.cross(v2v1, v3v1))
-		
+
 		local v41 = support_a(shape_a, dir)
 		local v42 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -dir :: any)))
 		local v4 = v41 - v42
-		
+
 		local dv1 = vector.dot(v1, dir)
 		local dv2 = vector.dot(v2, dir)
 		local dv3 = vector.dot(v3, dir)
@@ -266,7 +268,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 		if dot1 <= in_tolerance or iterations == MAX_ITER then
 			local depth, witness = tri_dist(V3_ZERO, v1, v2, v3)
 			local face_normal = vector.normalize(vector.cross(v2 - v1, v3 - v1))
-			
+
 			local witness_dot = vector.dot(face_normal, witness :: any)
 			if witness_dot < 0 then
 				face_normal = -face_normal
@@ -276,7 +278,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 			v2v1 = v2 - v1
 			v3v1 = v3 - v1
 			dir = vector.normalize(vector.cross(v2v1, v3v1))
-			
+
 			local b0 = vector.dot(vector.cross(v1, v2), v3)
 			local b1 = vector.dot(vector.cross(v3, v2), v0 :: any)
 			local b2 = vector.dot(vector.cross(v0 :: any, v1), v3)
@@ -290,14 +292,15 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 				b3 = vector.dot(vector.cross(v1, v2), dir)
 				sum = b1 + b2 + b3
 			end
-			
+
 			local inv = 1 / sum
-			local point_b = ptws(cframe_a, (b0 * v02 + b1 * v12 + b2 * v22 + b3 * v32 :: any) * inv)
-			
+			local point_a = ptws(cframe_a, (b0 * v01 + b1 * v11 + b2 * v21 + b3 * v31) * inv)
+			local point_b = ptws(cframe_a, (b0 * v02 + b1 * v12 + b2 * v22 + b3 * v32 :: Vector3) * inv)
+
 			local out_normal = vtws(cframe_a, face_normal :: any)
-			return true, -out_normal, depth, point_b
+			return true, -out_normal, depth, point_a, point_b
 		end
-		
+
 		local v4v0 = vector.cross(v4, v0 :: any)
 		dot = vector.dot(v1, v4v0)
 		if dot > 0 then
@@ -323,11 +326,11 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 				v12 = v42
 			end
 		end
-		
+
 		iterations += 1
 	end
-	
-	return false, vtws(cframe_a, -dir :: any), nil, nil
+
+	return false, vtws(cframe_a, -dir :: any), nil, nil, nil
 end
 
 local function is_separated<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cframe_b: CFrame, shape_b: U & types.Shape, cached_normal: Vector3): boolean
