@@ -21,6 +21,7 @@ local DEFAULT_CONVEX_RADIUS = .05
 export type Shape = types.Shape
 export type BoxShape = types.BoxShape
 export type SphereShape = types.SphereShape
+export type EllipsoidShape = types.EllipsoidShape
 export type CapsuleShape = types.CapsuleShape
 export type CylinderShape = types.CylinderShape
 export type WedgeShape = types.WedgeShape
