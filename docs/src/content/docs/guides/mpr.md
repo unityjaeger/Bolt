@@ -19,10 +19,10 @@ bolt.mpr.intersects(
     cframe_b: CFrame,
     shape_b: Shape,
     in_tolerance: number
-): (boolean, Vector3, number?, Vector3?)
+): (boolean, Vector3, number?, Vector3?, Vector3?)
 ```
 
-This function will give you a boolean to indicate whether or not an intersection has happened, the minimum translation vector, penetration depth and the intersection point on shape B in that order.
+This function will give you a boolean to indicate whether or not an intersection has happened, the minimum translation vector, penetration depth, the intersection point on shape A and lastly the intersection point on shape B in that order.
 
 The minimum translation vector will always be returned, and it can be used to quickly check if the two objects are still separated to dramatically speed up intersection tests in cases where objects generally don't move a lot inbetween calls.
 

@@ -22,7 +22,8 @@ export default defineConfig({
 						{ label: "GJK", slug: "guides/gjk" },
 						{ label: "SAT", slug: "guides/sat" },
 						{ label: "MPR", slug: "guides/mpr" },
-						{ label: "AABB Tree", slug: "guides/aabb_tree" }
+						{ label: "AABB Tree", slug: "guides/aabb_tree" },
+						{ label: "Meshes", slug: "guides/meshes" }
 					],
 				},
 			],
