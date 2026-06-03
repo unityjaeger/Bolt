@@ -7,6 +7,8 @@ Featuring:
 - Static AABB Trees using binned SAH
 - GJK (intersection, shapecast, raycast)
 - MPR (intersection with contact information)
+- SAT (intersection with contact information for box, wedge and corner wedge)
+- Proper mesh support through convex hulls
 - special-cased ray and intersection functions for:
     - Box
     - Sphere

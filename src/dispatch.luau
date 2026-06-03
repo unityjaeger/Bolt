@@ -251,7 +251,7 @@ local function dispatch_mpr_mesh_primitive<T, U>(
 	cframe_b: CFrame, 
 	shape_b: U & types.Shape, 
 	in_tolerance: number
-): {{normal: Vector3, depth: number, point: Vector3, hull_a_id: number?, hull_b_id: number?}}
+): {{normal: Vector3, depth: number, point_a: Vector3, point_b: Vector3, hull_a_id: number?, hull_b_id: number?}}
 	local is_mesh_a = shape_a.type == shape_map.MESH
 	local is_mesh_b = shape_b.type == shape_map.MESH
 	
@@ -263,9 +263,9 @@ local function dispatch_mpr_mesh_primitive<T, U>(
 		for _, hull_id in (shape_b :: types.MeshShape).local_tree:query_shape(in_b, shape_a) do
 			local hull = hulls[hull_id]
 			local hull_cf = cframe_b * CFrame.new(hull.offset * hull.scale)
-			local hit, normal, depth, point = mpr.intersects(cframe_a, shape_a, hull_cf, hull, in_tolerance)
+			local hit, normal, depth, point_a, point_b = mpr.intersects(cframe_a, shape_a, hull_cf, hull, in_tolerance)
 			if hit then
-				table.insert(out, {normal = normal, depth = depth :: number, point = point :: Vector3, hull_b_id = hull_id})
+				table.insert(out, {normal = normal, depth = depth :: number, point_a = point_a :: Vector3, point_b = point_b :: Vector3, hull_b_id = hull_id})
 			end
 		end
 	elseif is_mesh_a and not is_mesh_b then
@@ -274,9 +274,9 @@ local function dispatch_mpr_mesh_primitive<T, U>(
 		for _, hull_id in (shape_a :: types.MeshShape).local_tree:query_shape(in_a, shape_b) do
 			local hull = hulls[hull_id]
 			local hull_cf = cframe_a * CFrame.new(hull.offset * hull.scale)
-			local hit, normal, depth, point = mpr.intersects(hull_cf, hull, cframe_b, shape_b, in_tolerance)
+			local hit, normal, depth, point_a, point_b = mpr.intersects(hull_cf, hull, cframe_b, shape_b, in_tolerance)
 			if hit then
-				table.insert(out, {normal = -normal, depth = depth :: number, point = point :: Vector3, hull_a_id = hull_id})
+				table.insert(out, {normal = -normal, depth = depth :: number, point_a = point_b :: Vector3, point_b = point_a :: Vector3, hull_a_id = hull_id})
 			end
 		end
 	end
@@ -289,7 +289,7 @@ local function dispatch_mpr_mesh_mesh<T, U>(cframe_a: CFrame,
 	cframe_b: CFrame, 
 	shape_b: U & types.Shape, 
 	in_tolerance: number
-): {{normal: Vector3, depth: number, point: Vector3, hull_a_id: number?, hull_b_id: number?}}
+): {{normal: Vector3, depth: number, point_a: Vector3, point_b: Vector3, hull_a_id: number, hull_b_id: number}}
 	local out = {}
 	
 	local hulls_a = (shape_a :: types.MeshShape).hulls
@@ -301,9 +301,9 @@ local function dispatch_mpr_mesh_mesh<T, U>(cframe_a: CFrame,
 		for _, hull_b_id in local_tree_b:query_shape(in_b, hull_a) do
 			local hull_b = hulls_b[hull_b_id]
 			local hull_b_cf = cframe_b * CFrame.new(hull_b.offset * hull_b.scale)
-			local hit, normal, depth, point = mpr.intersects(hull_a_cf, hull_a, hull_b_cf, hull_b, in_tolerance)
+			local hit, normal, depth, point_a, point_b = mpr.intersects(hull_a_cf, hull_a, hull_b_cf, hull_b, in_tolerance)
 			if hit then
-				table.insert(out, {normal = normal, depth = depth :: number, point = point :: Vector3, hull_a_id = hull_a_id, hull_b_id = hull_b_id})
+				table.insert(out, {normal = normal, depth = depth :: number, point_a = point_a :: Vector3, point_b = point_b :: Vector3, hull_a_id = hull_a_id, hull_b_id = hull_b_id})
 			end
 		end
 	end
