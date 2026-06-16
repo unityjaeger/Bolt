@@ -81,9 +81,9 @@ end
 
 local function create_wedge(size: Vector3, convex_radius: number?): types.WedgeShape
 	local half_extents = size / 2	
-	
+
 	local hx, hy, hz = half_extents.X, half_extents.Y, half_extents.Z
-	
+
 	local sr = hx * RIGHT
 	local su = hy * UP
 	local sl = hz * LOOK
@@ -104,7 +104,7 @@ end
 
 local function create_corner_wedge(size: Vector3, convex_radius: number?): types.CornerWedgeShape
 	local half_extents = size / 2	
-	
+
 	local hx, hy, hz = half_extents.X, half_extents.Y, half_extents.Z
 
 	local sr = hx * RIGHT
@@ -132,9 +132,9 @@ end
 
 local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vector3, convex_radius: number?): types.MeshShape
 	local hull_shapes = {}
-	
+
 	local scale = size / mesh_info.size
-	
+
 	for i, v in mesh_info.hulls do
 		hull_shapes[i] = {
 			type = shape_map.HULL,
@@ -145,13 +145,13 @@ local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vect
 			convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
 		}
 	end
-	
+
 	local local_tree = aabb_tree.new_static()
 	for i, hull in hull_shapes do
 		local_tree:insert(i, CFrame.new(hull.offset), hull)
 	end
 	local_tree:full_rebuild()
-	
+
 	return {
 		type = shape_map.MESH,
 		hulls = hull_shapes,
@@ -165,16 +165,16 @@ end
 local function resize_mesh(mesh: MeshShape, size: Vector3)
 	local hulls = mesh.hulls
 	local local_tree = mesh.local_tree
-	
+
 	local new_half_extents = size / 2
 	local scale = new_half_extents / mesh.original_half_extents
-	
+
 	for _, hull in hulls do
 		hull.scale = scale
 	end
-	
+
 	mesh.half_extents = size / 2
-	
+
 	local_tree:clear()
 	for i, hull in hulls do
 		local_tree:insert(i, CFrame.new(hull.offset), hull)
@@ -194,7 +194,7 @@ local function create_from_part(part: BasePart, convex_radius: number?): types.S
 		elseif shape == Enum.PartType.Ball then
 			local sx, sy, sz = size.X, size.Y, size.Z
 			if sx ~= sy or sx ~= sz or sy ~= sz then
-				return create_ellipsoid(size/2, convex_radius)
+				return create_ellipsoid(size, convex_radius)
 			end
 			return create_sphere(sx/2, convex_radius)
 		elseif shape == Enum.PartType.Cylinder then
@@ -225,7 +225,7 @@ return {
 	create_corner_wedge = create_corner_wedge,
 	create_mesh = create_mesh,
 	create_from_part = create_from_part,
-	
+
 	resize_mesh = resize_mesh,
 
 	collision = {
@@ -259,7 +259,7 @@ return {
 		intersects = mpr.intersects,
 		is_separated = mpr.is_separated
 	},
-	
+
 	sat = {
 		box_box = sat.box_box,
 		box_wedge = sat.box_wedge,
@@ -268,7 +268,7 @@ return {
 		box_corner_wedge = sat.box_corner_wedge,
 		corner_wedge_corner_wedge = sat.corner_wedge_corner_wedge
 	},
-	
+
 	dispatch = {
 		gjk = {
 			intersects = dispatch.dispatch_gjk_intersects,
