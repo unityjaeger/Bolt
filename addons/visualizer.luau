@@ -3,7 +3,7 @@
 
 local run_service = game:GetService("RunService")
 
-local bolt = require("./bolt")
+local bolt = require(game.ReplicatedStorage.bolt)
 
 const PARENT = workspace.Terrain :: Terrain
 
