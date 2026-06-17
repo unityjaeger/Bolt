@@ -9,6 +9,14 @@ The visualizer is immediate-mode: it clears itself every frame, so anything you 
 
 By default, the addon assumes that `bolt` is located under `ReplicatedStorage`. If your project uses a different location, update the `require` path at the top of the visualizer module.
 
+You can grab the addon [here](https://github.com/unityjaeger/Bolt/blob/main/addons/visualizer.luau), just copy and paste the source code.
+
+The cleanup is run every `PreSimulation` frame, you can change which event is used by calling:
+
+```luau
+visualizer.init(event: RBXScriptSignal?)
+```
+
 ## Components
 The visualizer exposes shape components for each Bolt shape.
 

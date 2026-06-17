@@ -528,7 +528,7 @@ const function draw_primitive_primitive(cframe_a: CFrame, shape_a: bolt.Shape, c
 	reset_properties(restore_color, old_color, restore_transparency, old_transparency, restore_thickness, old_thickness)
 end
 
-const function raycast_primitive(ray_origin: Vector3, ray_direction: Vector3, cframe: CFrame, shape: bolt.Shape, point: Vector3?, distance: number?, normal: Vector3?, is_inside: boolean?)
+const function draw_raycast_primitive(ray_origin: Vector3, ray_direction: Vector3, cframe: CFrame, shape: bolt.Shape, point: Vector3?, distance: number?, normal: Vector3?)
 	local restore_color, old_color, restore_transparency, old_transparency, restore_thickness, old_thickness = consume_properties()
 
 	if not point then
@@ -706,21 +706,18 @@ const function draw_gjk_shapecast(cframe_a: CFrame, direction: Vector3, shape_a:
 	reset_properties(restore_color, old_color, restore_transparency, old_transparency, restore_thickness, old_thickness)
 end
 
-local is_initialized = false
-local event_used: RBXScriptSignal? = nil
+local connection: RBXScriptConnection?
 const function init(event: RBXScriptSignal?)
-	if (event ~= nil and event == event_used) or is_initialized then
+	if connection then
+		connection:Disconnect()
 		return
 	end
 	
 	event = event or run_service.PreSimulation
 	
-	event:Connect(function()
+	connection = event:Connect(function()
 		IMMEDIATE_WIREFRAME:Clear()
 	end)
-	
-	event_used = event
-	is_initialized = true
 end
 
 init()
@@ -748,7 +745,7 @@ return {
 	mpr_intersects = draw_mpr_intersects,
 	sat_intersects = draw_sat_intersects,
 	primitive_primitive = draw_primitive_primitive,
-	raycast_primitive = raycast_primitive,
+	raycast_primitive = draw_raycast_primitive,
 	gjk_shapecast_simple = draw_gjk_shapecast_simple,
 	gjk_shapecast = draw_gjk_shapecast
 }
