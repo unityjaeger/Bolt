@@ -3,7 +3,7 @@
 
 local run_service = game:GetService("RunService")
 
-local bolt = require(game.ReplicatedStorage.bolt)
+local bolt = require("./bolt")
 
 const PARENT = workspace.Terrain :: Terrain
 
@@ -594,7 +594,7 @@ const function draw_mpr_intersects(cframe_a: CFrame, shape_a: bolt.Shape, cframe
 	reset_properties(restore_color, old_color, restore_transparency, old_transparency, restore_thickness, old_thickness)
 end
 
-const function draw_sat_intersects(cframe_a: CFrame, shape_a: bolt.Shape, cframe_b: CFrame, shape_b: bolt.Shape, hit: boolean, mtv: Vector3, depth: number?)
+const function draw_sat_intersects(cframe_a: CFrame, shape_a: bolt.Shape, cframe_b: CFrame, shape_b: bolt.Shape, hit: boolean, mtv: Vector3?, depth: number?)
 	local restore_color, old_color, restore_transparency, old_transparency, restore_thickness, old_thickness = consume_properties()
 
 	if not hit then
