@@ -23,7 +23,8 @@ export default defineConfig({
 						{ label: "SAT", slug: "guides/sat" },
 						{ label: "MPR", slug: "guides/mpr" },
 						{ label: "AABB Tree", slug: "guides/aabb_tree" },
-						{ label: "Meshes", slug: "guides/meshes" }
+						{ label: "Meshes", slug: "guides/meshes" },
+						{ label: "Debug Addon", slug: "guides/addons" }
 					],
 				},
 			],
