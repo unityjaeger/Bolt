@@ -13,7 +13,7 @@ local function ray_sphere(
 	ray_direction: Vector3,
 	sphere_cf: CFrame,
 	sphere_shape: types.SphereShape
-): (Vector3?, number?, Vector3?, boolean?)
+): (Vector3?, number?, Vector3?, boolean?, number?)
 	local radius = sphere_shape.radius
 	
 	local sphere_origin = sphere_cf.Position
@@ -49,10 +49,10 @@ local function ray_sphere(
 		return nil, nil, nil, nil
 	end
 	
+	local magnitude = vector.magnitude(ray_direction :: any)
 	local hit = ray_origin + ray_direction * t
-	local dist = t * vector.magnitude(ray_direction :: any)
 	local normal = (hit - sphere_origin) * (1 / radius)
-	return hit, dist, normal, is_inside
+	return hit, t * magnitude, normal, is_inside, t2 * magnitude
 end
 
 local function ray_box(
@@ -60,7 +60,7 @@ local function ray_box(
 	ray_direction: Vector3,
 	box_cf: CFrame,
 	box_shape: types.BoxShape
-): (Vector3?, number?, Vector3?, boolean?)
+): (Vector3?, number?, Vector3?, boolean?, number?)
 	local pos, right, up, look = box_cf.Position, box_cf.RightVector, box_cf.UpVector, box_cf.LookVector
 
 	local rel = ray_origin - pos
@@ -146,8 +146,9 @@ local function ray_box(
 		is_inside = true
 	end
 
+	local magnitude = vector.magnitude(ray_direction :: any)
 	local hit = ray_origin + ray_direction * t
-	return hit, t * vector.magnitude(ray_direction :: any), world_normal, is_inside
+	return hit, t * magnitude, world_normal, is_inside, t_max * magnitude
 end
 
 local function ray_capsule(
@@ -155,7 +156,7 @@ local function ray_capsule(
 	ray_direction: Vector3,
 	capsule_cf: CFrame,
 	capsule_shape: types.CapsuleShape
-): (Vector3?, number?, Vector3?, boolean?)
+): (Vector3?, number?, Vector3?, boolean?, number?)
 	local radius = capsule_shape.radius
 	local half_height = capsule_shape.half_height
 	local radius_sq = radius * radius
@@ -177,7 +178,8 @@ local function ray_capsule(
 	local best_t = HUGE
 	local best_normal = nil
 	local is_inside = false
-	
+	local exit_t = -HUGE
+
 	local cyl_a = D_dot_D - ad * ad
 	if cyl_a > FLT_EPSILON then
 		local cyl_hb = D_dot_AO - ad * aao
@@ -188,7 +190,7 @@ local function ray_capsule(
 			local inv_a = 1 / cyl_a
 			local t1 = (-cyl_hb - sq) * inv_a
 			local t2 = (-cyl_hb + sq) * inv_a
-			
+
 			local t = if t1 >= 0 then t1 else t2
 			if t1 < 0 then
 				is_inside = true
@@ -202,9 +204,14 @@ local function ray_capsule(
 					best_normal = (hit - on_axis) * (1 / radius)
 				end
 			end
+
+			local far_proj = aao + t2 * ad
+			if far_proj >= 0 and far_proj <= length and t2 > exit_t then
+				exit_t = t2
+			end
 		end
 	end
-	
+
 	do
 		local disc = D_dot_AO * D_dot_AO - D_dot_D * (AO_sq - radius_sq)
 		if disc >= 0 then
@@ -220,9 +227,14 @@ local function ray_capsule(
 				local hit = ray_origin + ray_direction * t
 				best_normal = (hit - cap_a) * (1 / radius)
 			end
+
+			local far = (-D_dot_AO + sq) * inv_a
+			if (aao + far * ad) <= 0 and far > exit_t then
+				exit_t = far
+			end
 		end
 	end
-	
+
 	do
 		local BO = ray_origin - cap_b
 		local b = vector.dot(ray_direction :: any, BO :: any)
@@ -241,16 +253,25 @@ local function ray_capsule(
 				local hit = ray_origin + ray_direction * t
 				best_normal = (hit - cap_b) * (1 / radius)
 			end
+
+			local far = (-b + sq) * inv_a
+			if (aao + far * ad) >= length and far > exit_t then
+				exit_t = far
+			end
 		end
 	end
-	
+
 	if best_t == HUGE then
 		return nil, nil, nil, nil
 	end
-	
+
+	if exit_t < best_t then
+		exit_t = best_t
+	end
+
+	local magnitude = vector.magnitude(ray_direction :: any)
 	local hit = ray_origin + ray_direction * best_t
-	local dist = best_t * vector.magnitude(ray_direction :: any)
-	return hit, dist, best_normal, is_inside
+	return hit, best_t * magnitude, best_normal, is_inside, exit_t * magnitude
 end
 
 return {

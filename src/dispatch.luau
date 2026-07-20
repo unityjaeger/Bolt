@@ -80,12 +80,12 @@ local function dispatch_gjk_raycast<T, U>(
 	cframe: CFrame,
 	shape: T & types.Shape,
 	in_tolerance: number
-): (Vector3?, number?, Vector3?)
+): (Vector3?, number?, Vector3?, boolean?)
 	local is_mesh = shape.type == shape_map.MESH
-	
+
 	local best_distance = HUGE
-	local out_point : Vector3?, out_distance: number?, out_normal: Vector3? = nil, nil, nil
-	
+	local out_point : Vector3?, out_distance: number?, out_normal: Vector3?, out_inside: boolean? = nil, nil, nil, nil
+
 	if not is_mesh then
 		return gjk.raycast(ray_origin, ray_direction, cframe, shape, in_tolerance)
 	else
@@ -95,17 +95,18 @@ local function dispatch_gjk_raycast<T, U>(
 		for _, hull_id in (shape :: types.MeshShape).local_tree:query_ray(local_origin, local_direction) do
 			local hull = hulls[hull_id]
 			local hull_cf = cframe * CFrame.new(hull.offset * hull.scale)
-			local point, distance, normal = gjk.raycast(ray_origin, ray_direction, hull_cf, hull, in_tolerance)
+			local point, distance, normal, is_inside = gjk.raycast(ray_origin, ray_direction, hull_cf, hull, in_tolerance)
 			if distance and distance < best_distance then
 				best_distance = distance
 				out_point = point
 				out_distance = distance
 				out_normal = normal
+				out_inside = is_inside
 			end
 		end
 	end
-	
-	return out_point, out_distance, out_normal
+
+	return out_point, out_distance, out_normal, out_inside
 end
 
 --shapecast_simple

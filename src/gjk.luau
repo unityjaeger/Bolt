@@ -431,7 +431,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 	end
 end
 
-local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, cframe: CFrame, shape: T & types.Shape, in_tolerance: number): (Vector3?, number?, Vector3?)
+local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, cframe: CFrame, shape: T & types.Shape, in_tolerance: number): (Vector3?, number?, Vector3?, boolean?)
 	local local_origin = ptos(cframe, ray_origin)
 	local local_direction = vtos(cframe, ray_direction)
 
@@ -509,11 +509,12 @@ local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, cframe: C
 		end
 	end
 
+	local is_inside = out_normal == nil
 	out_normal = out_normal and vector.normalize(out_normal :: any) or V_ZERO
 	local world_normal = vtws(cframe, out_normal :: any)
 	local world_point = ptws(cframe, x)
 
-	return world_point, lambda * vector.magnitude(ray_direction :: any), world_normal
+	return world_point, lambda * vector.magnitude(ray_direction :: any), world_normal, is_inside
 end
 
 local function shapecast_simple<T, U>(cframe_a: CFrame, direction: Vector3, shape_a: T & types.Shape, cframe_b: CFrame, shape_b: U & types.Shape, in_tolerance: number): (boolean, number?)
