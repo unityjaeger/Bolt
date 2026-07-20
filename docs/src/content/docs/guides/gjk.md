@@ -37,11 +37,13 @@ bolt.gjk.raycast(
     cframe: CFrame,
     shape: Shape,
     in_tolerance: number
-): (Vector3?, number?, Vector3?)
+): (Vector3?, number?, Vector3?, boolean?)
 ```
-The return values in order are hit point, distance and hit normal. 
+The return values in order are hit point, distance, hit normal and a boolean that indicates whether or not the ray started inside of the shape.
 
-If the hit point is `nil`, then the other two return values will also be `nil`.
+When the boolean is `true`, the distance will be `0`, the hit point will be the ray origin and the hit normal will be the zero vector, so check it before using the normal.
+
+If the hit point is `nil`, then the other return values will also be `nil`.
 
 There are two ways to shapecast, `shapecast_simple` will only tell you if the cast has hit and the distance
 ```luau

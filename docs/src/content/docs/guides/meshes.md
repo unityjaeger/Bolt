@@ -54,8 +54,9 @@ bolt.dispatch.gjk.raycast(
 	cframe: CFrame,
 	shape: Shape,
 	in_tolerance: number
-): (Vector3?, number?, Vector3?)
+): (Vector3?, number?, Vector3?, boolean?)
 ```
+The boolean indicates whether or not the ray started inside of the shape, for meshes it belongs to the hull that produced the winning hit.
 
 ### Shapecasting
 ```luau
