@@ -710,7 +710,6 @@ local connection: RBXScriptConnection?
 const function init(event: RBXScriptSignal?)
 	if connection then
 		connection:Disconnect()
-		return
 	end
 	
 	event = event or run_service.PreSimulation
