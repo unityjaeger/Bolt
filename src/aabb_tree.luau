@@ -95,12 +95,14 @@ local function shape_aabb(cf: CFrame, shape): (vector, vector)
 		local center = cf.Position
 
 		local axis = vector.abs(cf.RightVector :: any)
-		local rx, ry, rz = axis.x, axis.y, axis.z
+		local up, look = cf.UpVector, cf.LookVector
+		local ux, uy, uz = up.X, up.Y, up.Z
+		local lx, ly, lz = look.X, look.Y, look.Z
 
 		local e = vector.create(
-			half_height * rx + radius * (1 - rx * rx)^.5,
-			half_height * ry + radius * (1 - ry * ry)^.5,
-			half_height * rz + radius * (1 - rz * rz)^.5
+			half_height * axis.x + radius * (ux * ux + lx * lx)^.5,
+			half_height * axis.y + radius * (uy * uy + ly * ly)^.5,
+			half_height * axis.z + radius * (uz * uz + lz * lz)^.5
 		)
 
 		return center - e :: any, center + e :: any
