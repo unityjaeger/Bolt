@@ -8,6 +8,7 @@ local support_map = require("./support_map")
 
 local FLT_EPSILON = constants.FLT_EPSILON
 local FLT_EPSILON_SQ = FLT_EPSILON * FLT_EPSILON
+local CAST_FRACTION_EPSILON = FLT_EPSILON * 8
 local HUGE = constants.HUGE
 
 local V_ZERO = Vector3.zero
@@ -342,10 +343,24 @@ local function get_max_y_length_sq(): number
 	return y_len_sq
 end
 
+local function cast_is_near_contact(v: Vector3, w: Vector3, tolerance_sq: number): boolean
+	local v_len_sq = vector.dot(v :: any, v :: any)
+	if v_len_sq <= tolerance_sq then
+		return true
+	end
+
+	local scale_sq = vector.dot(w :: any, w :: any)
+	if m_num_points > 0 then
+		scale_sq = math.max(scale_sq, get_max_y_length_sq())
+	end
+
+	return v_len_sq <= FLT_EPSILON * scale_sq
+end
+
 local function update_point_set_y(set: number)
 	local num_points = 0
 	for i = 1, m_num_points do
-		if (bit32.band(set, bit32.lshift(1, i - 1)) ~= 0) then
+		if bit32.band(set, bit32.lshift(1, i - 1)) ~= 0 then
 			num_points += 1
 			m_y[num_points] = m_y[i]
 		end
@@ -356,8 +371,9 @@ end
 local function update_point_set_p(set: number)
 	local num_points = 0
 	for i = 1, m_num_points do
-		if (bit32.band(set, bit32.lshift(1, i - 1)) ~= 0) then
+		if bit32.band(set, bit32.lshift(1, i - 1)) ~= 0 then
 			num_points += 1
+			m_y[num_points] = m_y[i]
 			m_p[num_points] = m_p[i]
 		end
 	end
@@ -367,8 +383,9 @@ end
 local function update_point_set_pq(set: number)
 	local num_points = 0
 	for i = 1, m_num_points do
-		if (bit32.band(set, bit32.lshift(1, i - 1)) ~= 0) then
+		if bit32.band(set, bit32.lshift(1, i - 1)) ~= 0 then
 			num_points += 1
+			m_y[num_points] = m_y[i]
 			m_p[num_points] = m_p[i]
 			m_q[num_points] = m_q[i]
 		end
@@ -416,7 +433,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 			return true, V_ZERO
 		end
 
-		if prev_v_len_sq <= FLT_EPSILON * get_max_y_length_sq() then
+		if v_len_sq <= FLT_EPSILON * get_max_y_length_sq() then
 			return true, V_ZERO
 		end
 
@@ -447,7 +464,9 @@ local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, cframe: C
 	local v_len_sq = HUGE
 	local allow_restart = false
 
-	local out_normal
+	--jolt keeps the separating axis from the previous converged simplex
+	--the current axis can be nearly zero at the hit and is not a stable normal
+	local prev_v = V_ZERO
 
 	while true do
 		local p = support(shape, v)
@@ -457,22 +476,28 @@ local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, cframe: C
 		if v_dot_w > 0 then
 			local v_dot_r = vector.dot(v :: any, local_direction :: any)
 			if v_dot_r >= -1e-18 then
+				if cast_is_near_contact(v, w, tolerance_sq) then
+					break
+				end
 				return nil, nil, nil
 			end
 
 			local delta = v_dot_w / v_dot_r
 			local old_lambda = lambda
-			lambda -= delta
+			local new_lambda = lambda - delta
 
-			if old_lambda == lambda then
-				break
-			end
-
-			if lambda >= 1 then
+			if new_lambda > 1 + CAST_FRACTION_EPSILON then
 				return nil, nil, nil
 			end
 
-			out_normal = v
+			new_lambda = math.min(new_lambda, 1)
+
+			if new_lambda == old_lambda then
+				break
+			end
+
+			lambda = new_lambda
+			prev_v = v
 			x = local_origin + lambda * local_direction
 			v_len_sq = HUGE
 			allow_restart = true
@@ -507,9 +532,18 @@ local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, cframe: C
 		if v_len_sq <= tolerance_sq then
 			break
 		end
+
+		prev_v = v
 	end
 
-	out_normal = out_normal and vector.normalize(out_normal :: any) or V_ZERO
+	--a cast that never advanced started in contact
+	--there is no separating axis in that case, so preserve the zero normal behavior
+	local prev_v_len_sq = vector.dot(prev_v :: any, prev_v :: any)
+	local out_normal =
+		(lambda == 0 or prev_v_len_sq == 0)
+		and V_ZERO
+		or vector.normalize(prev_v :: any)
+
 	local world_normal = vtws(cframe, out_normal :: any)
 	local world_point = ptws(cframe, x)
 
@@ -541,21 +575,27 @@ local function shapecast_simple<T, U>(cframe_a: CFrame, direction: Vector3, shap
 		if v_dot_w > 0 then
 			local v_dot_r = vector.dot(v :: any, local_direction :: any)
 			if v_dot_r >= -1e-18 then
+				if cast_is_near_contact(v, w, tolerance_sq) then
+					break
+				end
 				return false, nil
 			end
 
 			local delta = v_dot_w / v_dot_r
 			local old_lambda = lambda
-			lambda -= delta
+			local new_lambda = lambda - delta
 
-			if old_lambda == lambda then
-				break
-			end
-
-			if lambda >= 1 then
+			if new_lambda > 1 + CAST_FRACTION_EPSILON then
 				return false, nil
 			end
 
+			new_lambda = math.min(new_lambda, 1)
+
+			if new_lambda == old_lambda then
+				break
+			end
+
+			lambda = new_lambda
 			x = lambda * local_direction
 			v_len_sq = HUGE
 			allow_restart = true
@@ -599,11 +639,7 @@ local function shapecast<T, U>(cframe_a: CFrame, direction: Vector3, shape_a: T 
 	local local_start = tos(cframe_b, cframe_a)
 	local local_direction = vtos(cframe_b, direction)
 
-	local convex_radius_a = shape_a.convex_radius
-	local convex_radius_b = shape_b.convex_radius
-
 	local tolerance_sq = in_tolerance * in_tolerance
-	local sum_convex_radius = convex_radius_a + convex_radius_b
 
 	local support_a = support_map[shape_a.type]
 	local support_b = support_map[shape_b.type]
@@ -622,29 +658,39 @@ local function shapecast<T, U>(cframe_a: CFrame, direction: Vector3, shape_a: T 
 		local q = support_b(shape_b, v)
 		local w = x - (q - p)
 
-		local v_dot_w = vector.dot(v :: any, w :: any) - sum_convex_radius * vector.magnitude(v :: any)
+		local v_dot_w = vector.dot(v :: any, w :: any)
 		if v_dot_w > 0 then
 			local v_dot_r = vector.dot(v :: any, local_direction :: any)
 			if v_dot_r >= -1e-18 then
+				if cast_is_near_contact(v, w, tolerance_sq) then
+					if m_num_points == 0 then
+						m_num_points = 1
+						m_p[1] = p
+						m_q[1] = q
+					end
+					break
+				end
 				return nil, nil, nil
 			end
 
 			local delta = v_dot_w / v_dot_r
 			local old_lambda = lambda
-			lambda -= delta
+			local new_lambda = lambda - delta
 
-			if old_lambda == lambda then
-				break
-			end
-
-			if lambda >= 1 then
+			if new_lambda > 1 + CAST_FRACTION_EPSILON then
 				return nil, nil, nil
 			end
 
+			new_lambda = math.min(new_lambda, 1)
+
+			if new_lambda == old_lambda then
+				break
+			end
+
+			lambda = new_lambda
+			prev_v = v
 			x = lambda * local_direction
 			v_len_sq = HUGE
-			local _tolerance = (in_tolerance + sum_convex_radius)
-			tolerance_sq = _tolerance * _tolerance
 			allow_restart = true
 		end
 
@@ -687,23 +733,25 @@ local function shapecast<T, U>(cframe_a: CFrame, direction: Vector3, shape_a: T 
 		m_y[i] = x - (m_q[i] - m_p[i])
 	end
 
-	local normalized_v = vector.dot(v :: any, v :: any) < FLT_EPSILON and V_ZERO or vector.normalize(v :: any) :: any
-	local offset_b = convex_radius_b * normalized_v
-
 	local point
 	if m_num_points == 1 then
-		point = m_q[1] + offset_b
+		point = m_q[1]
 	elseif m_num_points == 2 then
 		local bu, bv = get_barycentric_coordinates_2d(m_y[1], m_y[2])
-		point = bu * m_q[1] + bv * m_q[2] + offset_b
+		point = bu * m_q[1] + bv * m_q[2]
 	elseif m_num_points == 3 or m_num_points == 4 then
 		local bu, bv, bw = get_barycentric_coordinates_3d(m_y[1], m_y[2], m_y[3])
-		point = bu * m_q[1] + bv * m_q[2] + bw * m_q[3] + offset_b
+		point = bu * m_q[1] + bv * m_q[2] + bw * m_q[3]
 	end
 
-	local out_normal = sum_convex_radius > 0 and normalized_v or vector.dot(prev_v :: any, prev_v :: any) < FLT_EPSILON and V_ZERO or vector.normalize(prev_v :: any)
-	local world_normal = vtws(cframe_b, out_normal)
-	local world_hit = ptws(cframe_b, point)
+	local prev_v_len_sq = vector.dot(prev_v :: any, prev_v :: any)
+	local out_normal =
+		(lambda == 0 or prev_v_len_sq == 0)
+		and V_ZERO
+		or vector.normalize(prev_v :: any)
+
+	local world_normal = vtws(cframe_b, out_normal :: any)
+	local world_hit = ptws(cframe_b, point :: any)
 
 	return world_hit, lambda * vector.magnitude(local_direction :: any), world_normal
 end

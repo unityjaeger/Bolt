@@ -21,6 +21,8 @@ local NULL = 0
 
 local TRUE_HUGE = math.huge
 local HUGE_VECTOR = vector.one * 2^32
+local NEG_INF_VEC = -vector.one * math.huge
+local POS_INF_VEC = vector.one * math.huge
 
 local query_traversal_stack = table.create(128) :: {number}
 
@@ -51,8 +53,8 @@ local function aabb_overlap(a_min: vector, a_max: vector, b_min: vector, b_max: 
 end
 
 local function ray_aabb(ray_origin: Vector3, ray_inv_dir: Vector3, min: vector, max: vector): boolean
-	local t1 = (min - ray_origin :: any) * ray_inv_dir
-	local t2 = (max - ray_origin :: any) * ray_inv_dir
+	local t1 = vector.max(NEG_INF_VEC, (min - ray_origin :: any) * ray_inv_dir)
+	local t2 = vector.min(POS_INF_VEC, (max - ray_origin :: any) * ray_inv_dir)
 
 	local min_vec = vector.min(t1, t2)
 	local max_vec = vector.max(t1, t2)
@@ -63,7 +65,7 @@ local function ray_aabb(ray_origin: Vector3, ray_inv_dir: Vector3, min: vector, 
 	return tmax >= math.max(tmin, 0) and tmin <= 1
 end
 
-local function shape_aabb(cf: CFrame, shape): (vector, vector)
+local function shape_aabb(cf: CFrame, shape: types.Shape): (vector, vector)
 	if shape.type == shape_map.BOX or shape.type == shape_map.MESH then
 		local half_extents = (shape :: types.BoxShape).half_extents
 		local center = cf.Position
@@ -80,6 +82,23 @@ local function shape_aabb(cf: CFrame, shape): (vector, vector)
 
 		local e = vector.one * radius
 
+		return center - e :: any, center + e :: any
+	elseif shape.type == shape_map.ELLIPSOID then
+		local half_extents = (shape :: types.EllipsoidShape).half_extents
+		local center = cf.Position
+		local right, up, look = cf.RightVector, cf.UpVector, cf.LookVector
+
+		local rx, ry, rz = right.X, right.Y, right.Z
+		local ux, uy, uz = up.X, up.Y, up.Z
+		local lx, ly, lz = look.X, look.Y, look.Z
+
+		local hx, hy, hz = half_extents.X, half_extents.Y, half_extents.Z
+
+		local ex = math.sqrt((hx * rx) ^ 2 + (hy * ux) ^ 2 + (hz * lx) ^ 2)
+		local ey = math.sqrt((hx * ry) ^ 2 + (hy * uy) ^ 2 + (hz * ly) ^ 2)
+		local ez = math.sqrt((hx * rz) ^ 2 + (hy * uz) ^ 2 + (hz * lz) ^ 2)
+
+		local e = vector.create(ex, ey, ez)
 		return center - e :: any, center + e :: any
 	elseif shape.type == shape_map.CAPSULE then
 		local radius = (shape :: types.CapsuleShape).radius
@@ -131,7 +150,7 @@ local function shape_aabb(cf: CFrame, shape): (vector, vector)
 
 		local v1 = sr + sl - su
 		local v2 = sr - sl - su
-		local v3 = sr + sl + su
+		local v3 = sr - sl + su
 		local v4 = -sr - sl - su
 		local v5 = -sr + sl - su
 
@@ -141,21 +160,20 @@ local function shape_aabb(cf: CFrame, shape): (vector, vector)
 		return origin + minv :: any, origin + maxv :: any
 	elseif shape.type == shape_map.HULL then
 		local hull = (shape :: types.HullShape)
-		local vertices = hull.vertices
-		
-		local min = vertices[1]
-		local max = vertices[1]
-		
 		local scale = hull.scale
-		
+		local vertices = hull.vertices
+
+		local point = cf * (vertices[1] * scale)
+		local min = point
+		local max = point
+
 		for i = 2, #vertices do
-			local vert = vertices[i]
-			min = vector.min(min :: any, vert :: any)
-			max = vector.max(max :: any, vert :: any)
+			point = cf * (vertices[i] * scale)
+			min = vector.min(min :: any, point :: any)
+			max = vector.max(max :: any, point :: any)
 		end
-		
-		local pos = hull.offset
-		return (pos + min :: any) * scale, (pos + max :: any) * scale
+
+		return min :: any, max :: any
 	else
 		error("unsupported shape")
 	end
@@ -240,7 +258,7 @@ local function find_best_sibling(dyn_tree: DynamicTree, min: vector, max: vector
 		local area1 = 0
 		if leaf1 then
 			local cost1 = direct_cost1 + inherited_cost
-			if cost < best_cost then
+			if cost1 < best_cost then
 				best_sibling = child1_index
 				best_cost = cost1
 			end
@@ -621,6 +639,10 @@ local function public_remove(dyn_tree: DynamicTree, id: number)
 
 	remove_leaf(dyn_tree, index)
 	free(dyn_tree, index)
+
+	if dyn_tree.proxy_count == 0 then
+		dyn_tree.base_cost_ratio = nil
+	end
 end
 
 local function public_move(dyn_tree: DynamicTree, id: number, cf: CFrame)
@@ -649,10 +671,12 @@ local function public_resize(dyn_tree: DynamicTree, id: number, shape: types.Sha
 	local node = dyn_tree.nodes[index]
 	local min, max = shape_aabb(node.cf, shape)
 
+	local padding = dyn_tree.padding
+
 	remove_leaf(dyn_tree, index)
 
-	node.aabb_min = min
-	node.aabb_max = max
+	node.aabb_min = min - padding
+	node.aabb_max = max + padding
 	node.shape = shape
 
 	insert_leaf(dyn_tree, index)
@@ -759,15 +783,15 @@ local function public_query_shapecast(tree: Tree, shape: types.Shape, origin: CF
 	local inv_ray_dir = 1 / direction
 
 	local min, max = shape_aabb(origin, shape)
-	local half_extents = (max - min) / 2
-	local ray_origin = origin.Position
+	local half_extents = (max - min) * .5
+	local ray_origin = (min + max) * .5
 
 	while top > 0 do
 		local index = query_traversal_stack[top]
 		top -= 1
 
 		local node = nodes[index]
-		if ray_aabb(ray_origin, inv_ray_dir, node.aabb_min - half_extents, node.aabb_max + half_extents) then
+		if ray_aabb(ray_origin :: any, inv_ray_dir, node.aabb_min - half_extents, node.aabb_max + half_extents) then
 			if node.child1 == NULL then
 				table.insert(out, node.id)
 			else
@@ -1012,6 +1036,11 @@ local function compute_cost_ratio(tree: Tree): number
 end
 
 local function rebuild_tree(tree: Tree, full_build: boolean): number
+	if tree.root == NULL then
+		tree.base_cost_ratio = nil
+		return 0
+	end
+
 	local leaf_indices = {}
 	local leaf_boxes_min = {}
 	local leaf_boxes_max = {}
@@ -1059,6 +1088,10 @@ local function rebuild_tree(tree: Tree, full_build: boolean): number
 end
 
 local function should_rebuild(dyn_tree: DynamicTree): boolean
+	if dyn_tree.root == NULL then
+		return false
+	end
+
 	if dyn_tree.base_cost_ratio == nil then
 		if dyn_tree.proxy_count < INITIAL_REBUILD_THRESHOLD then
 			return false

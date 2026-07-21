@@ -1,6 +1,5 @@
 export type Shape = {
-	type: number,
-	convex_radius: number
+	type: number
 }
 
 export type BoxShape = Shape & {

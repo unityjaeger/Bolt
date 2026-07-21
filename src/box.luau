@@ -6,13 +6,15 @@ local types = require("./types")
 local constants = require("./constants")
 
 local FLT_EPSILON = constants.FLT_EPSILON
+local HUGE = constants.HUGE
+local V_ZERO = vector.zero
 
 local function box_box(box_a_cf: CFrame, box_a_shape: types.BoxShape, box_b_cf: CFrame, box_b_shape: types.BoxShape): boolean
 	local diff = box_b_cf.Position - box_a_cf.Position
 
 	local axa, aya, aza = box_a_cf.RightVector, box_a_cf.UpVector, box_a_cf.LookVector
 	local axb, ayb, azb = box_b_cf.RightVector, box_b_cf.UpVector, box_b_cf.LookVector
-	
+
 	local half_extents_a = box_a_shape.half_extents
 	local half_extents_b = box_b_shape.half_extents
 	local hxa, hya, hza = half_extents_a.X, half_extents_a.Y, half_extents_a.Z
@@ -75,6 +77,29 @@ local function box_sphere(box_cf: CFrame, box_shape: types.BoxShape, sphere_cf: 
 	return dx*dx + dy*dy + dz*dz <= sphere_radius * sphere_radius
 end
 
+local breakpoints = table.create(8) :: {number}
+
+local function point_aabb_distance_sq(point: Vector3, half_extents: Vector3): number
+	local d = vector.max(vector.abs(point :: any) - half_extents :: any, V_ZERO)
+	return vector.dot(d, d)
+end
+
+local function add_breakpoints(o: number, d: number, h: number, half_height: number)
+	if d == 0 then
+		return
+	end
+	
+	local t1 = (-h - o) / d
+	local t2 = ( h - o) / d
+	
+	if t1 > -half_height and t1 < half_height then
+		table.insert(breakpoints, t1)
+	end
+	if t2 > -half_height and t2 < half_height then
+		table.insert(breakpoints, t2)
+	end
+end
+
 local function box_capsule(box_cf: CFrame, box_shape: types.BoxShape, capsule_cf: CFrame, capsule_shape: types.CapsuleShape): boolean
 	local local_capsule_cf = box_cf:ToObjectSpace(capsule_cf)
 	local local_capsule_origin = local_capsule_cf.Position
@@ -82,25 +107,95 @@ local function box_capsule(box_cf: CFrame, box_shape: types.BoxShape, capsule_cf
 	local box_half_extents = box_shape.half_extents
 	local capsule_half_height = capsule_shape.half_height
 	local capsule_radius = capsule_shape.radius
-
-	local t = math.clamp(
-		vector.dot(local_capsule_axis :: any, local_capsule_origin :: any),
-		-capsule_half_height, capsule_half_height
-	)
 	
-	local seg_pt = local_capsule_origin + local_capsule_axis * t
-	local box_pt = vector.clamp(seg_pt :: any, -box_half_extents :: any, box_half_extents :: any)
-
-	t = math.clamp(
-		vector.dot(local_capsule_axis :: any, box_pt - local_capsule_origin :: any),
-		-capsule_half_height, capsule_half_height
-	)
+	table.clear(breakpoints)
 	
-	local closest_on_segment = local_capsule_origin + local_capsule_axis * t
-	local closest_on_box = vector.clamp(closest_on_segment :: any, -box_half_extents :: any, box_half_extents :: any)
+	breakpoints[1] = -capsule_half_height
+	breakpoints[2] = capsule_half_height
+	
+	local ox, oy, oz = local_capsule_origin.X, local_capsule_origin.Y, local_capsule_origin.Z
+	local ax, ay, az = local_capsule_axis.X, local_capsule_axis.Y, local_capsule_axis.Z
+	local hx, hy, hz = box_half_extents.X, box_half_extents.Y, box_half_extents.Z
+	
+	add_breakpoints(ox, ax, hx, capsule_half_height)
+	add_breakpoints(oy, ay, hy, capsule_half_height)
+	add_breakpoints(oz, az, hz, capsule_half_height)
+	
+	table.sort(breakpoints)
+	
+	local best_distance_sq = HUGE
+	for _, t in breakpoints do
+		best_distance_sq = math.min(
+			best_distance_sq,
+			point_aabb_distance_sq(local_capsule_origin + local_capsule_axis * t, box_half_extents)
+		)
+	end
+	
+	for i = 1, #breakpoints - 1 do
+		local lo = breakpoints[i]
+		local hi = breakpoints[i + 1]
+		
+		if hi <= lo then
+			continue
+		end
+		
+		local mid = (lo + hi) * .5
+		local point = local_capsule_origin + local_capsule_axis * mid
+		local px, py, pz = point.X, point.Y, point.Z
+		
+		local denominator = 0
+		local numerator = 0
+		
+		do
+			local bound
+			if px < -hx then
+				bound = -hx
+			elseif px > hx then
+				bound = hx
+			end
+			
+			if bound then
+				denominator += ax * ax
+				numerator += ax * (ox - bound)
+			end
+		end
+		do
+			local bound
+			if py < -hy then
+				bound = -hy
+			elseif py > hy then
+				bound = hy
+			end
 
-	local diff = closest_on_segment - closest_on_box :: any
-	return vector.dot(diff :: any, diff :: any) <= capsule_radius * capsule_radius
+			if bound then
+				denominator += ay * ay
+				numerator += ay * (oy - bound)
+			end
+		end
+		do
+			local bound
+			if pz < -hz then
+				bound = -hz
+			elseif pz > hz then
+				bound = hz
+			end
+
+			if bound then
+				denominator += az * az
+				numerator += az * (oz - bound)
+			end
+		end
+		
+		if denominator > 0 then
+			local t = math.clamp(-numerator / denominator, lo, hi)
+			best_distance_sq = math.min(
+				best_distance_sq,
+				point_aabb_distance_sq(local_capsule_origin + local_capsule_axis * t, box_half_extents)
+			)
+		end
+	end
+	
+	return best_distance_sq <= capsule_radius * capsule_radius
 end
 
 return {

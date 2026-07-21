@@ -100,13 +100,13 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 	local v1 = v11 - v12
 
 	local dot = vector.dot(v1, dir)
-	if dot < FLT_EPSILON then
+	if dot < -in_tolerance then
 		return false, vtws(cframe_a, -dir :: any), nil, nil, nil
 	end
 
 	dir = vector.cross(v0 :: any, v1)
 	if vector.dot(dir, dir) < FLT_EPSILON then
-		if vector.magnitude(v1) < FLT_EPSILON then
+		if vector.magnitude(v1) <= in_tolerance then
 			local point_a = ptws(cframe_a, v11)
 			local point_b = ptws(cframe_a, v12)
 			return true, V3_ZERO, 0, point_a, point_b
@@ -125,7 +125,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 	local v2 = v21 - v22
 
 	dot = vector.dot(v2, dir)
-	if dot < FLT_EPSILON then
+	if dot < -in_tolerance then
 		return false, vtws(cframe_a, -dir :: any), nil, nil, nil
 	end
 
@@ -147,7 +147,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 		v32 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -dir :: any)))
 		v3 = v31 - v32
 		local dot_v3 = vector.dot(v3, dir)
-		if dot_v3 < FLT_EPSILON then
+		if dot_v3 < -in_tolerance then
 			return false, vtws(cframe_a, -dir :: any), nil, nil, nil
 		end
 
@@ -182,13 +182,15 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 	end
 
 	local success = false
+	local portal_within_tolerance = false
 	for i = 1, MAX_ITER do
 		local v2v1 = v2 - v1
 		local v3v1 = v3 - v1
 		dir = vector.normalize(vector.cross(v2v1, v3v1))
-		dot = vector.dot(dir, v1)
-		if dot > -FLT_EPSILON then
+		local portal_distance = vector.dot(dir, v1)
+		if portal_distance >= -in_tolerance then
 			success = true
+			portal_within_tolerance = portal_distance <= in_tolerance
 			break
 		end
 
@@ -196,7 +198,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 		local v42 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -dir :: any)))
 		local v4 = v41 - v42
 		dot = vector.dot(v4, dir)
-		if dot <= -FLT_EPSILON then
+		if dot < -in_tolerance then
 			return false, vtws(cframe_a, -dir :: any), nil, nil, nil
 		end
 
@@ -245,7 +247,9 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 		return false, vtws(cframe_a, -dir :: any), nil, nil, nil
 	end
 
-	local iterations = 0
+	--libccd treats a portal face at the origin as a touching contact
+	--if the face is only outside/inside by the configured numerical tolerance, use the current face directly instead of trying to refine past precision
+	local iterations = portal_within_tolerance and MAX_ITER or 0
 	while true do
 		local v2v1 = v2 - v1
 		local v3v1 = v3 - v1
@@ -274,6 +278,10 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 				face_normal = -face_normal
 			end
 			depth = math.abs(witness_dot)
+			local touching_contact = depth <= in_tolerance
+			if touching_contact then
+				depth = 0
+			end
 
 			v2v1 = v2 - v1
 			v3v1 = v3 - v1
@@ -296,6 +304,10 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 			local inv = 1 / sum
 			local point_a = ptws(cframe_a, (b0 * v01 + b1 * v11 + b2 * v21 + b3 * v31) * inv)
 			local point_b = ptws(cframe_a, (b0 * v02 + b1 * v12 + b2 * v22 + b3 * v32 :: Vector3) * inv)
+
+			if touching_contact then
+				return true, V3_ZERO, depth, point_a, point_b
+			end
 
 			local out_normal = vtws(cframe_a, face_normal :: any)
 			return true, -out_normal, depth, point_a, point_b
@@ -345,7 +357,7 @@ local function is_separated<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cf
 	local v_test = v12 - v11
 
 	local gap = vector.dot(v_test :: any, normal_in_a :: any)
-	return gap <= FLT_EPSILON
+	return gap < 0
 end
 
 return {

@@ -24,7 +24,7 @@ local function dispatch_gjk_intersects<T, U>(
 ): boolean
 	local is_mesh_a = shape_a.type == shape_map.MESH
 	local is_mesh_b = shape_b.type == shape_map.MESH
-	
+
 	if not is_mesh_a and not is_mesh_b then
 		local hit = gjk.intersects(cframe_a, shape_a, cframe_b, shape_b, in_tolerance)
 		if hit then
@@ -69,7 +69,7 @@ local function dispatch_gjk_intersects<T, U>(
 			end
 		end
 	end
-	
+
 	return false
 end
 
@@ -82,10 +82,10 @@ local function dispatch_gjk_raycast<T, U>(
 	in_tolerance: number
 ): (Vector3?, number?, Vector3?)
 	local is_mesh = shape.type == shape_map.MESH
-	
+
 	local best_distance = HUGE
 	local out_point : Vector3?, out_distance: number?, out_normal: Vector3? = nil, nil, nil
-	
+
 	if not is_mesh then
 		return gjk.raycast(ray_origin, ray_direction, cframe, shape, in_tolerance)
 	else
@@ -104,7 +104,7 @@ local function dispatch_gjk_raycast<T, U>(
 			end
 		end
 	end
-	
+
 	return out_point, out_distance, out_normal
 end
 
@@ -119,10 +119,10 @@ local function dispatch_gjk_shapecast_simple<T, U>(
 ): (boolean, number?)
 	local is_mesh_a = shape_a.type == shape_map.MESH
 	local is_mesh_b = shape_b.type == shape_map.MESH
-	
+
 	local best_distance = HUGE
 	local out_distance: number? = nil
-	
+
 	if not is_mesh_a and not is_mesh_b then
 		return gjk.shapecast_simple(cframe_a, direction, shape_a, cframe_b, shape_b, in_tolerance)
 	elseif not is_mesh_a and is_mesh_b then
@@ -170,7 +170,7 @@ local function dispatch_gjk_shapecast_simple<T, U>(
 			end
 		end
 	end
-	
+
 	return out_distance ~= nil, out_distance
 end
 
@@ -254,9 +254,9 @@ local function dispatch_mpr_mesh_primitive<T, U>(
 ): {{normal: Vector3, depth: number, point_a: Vector3, point_b: Vector3, hull_a_id: number?, hull_b_id: number?}}
 	local is_mesh_a = shape_a.type == shape_map.MESH
 	local is_mesh_b = shape_b.type == shape_map.MESH
-	
+
 	local out = {}
-	
+
 	if not is_mesh_a and is_mesh_b then
 		local in_b = tos(cframe_b, cframe_a)
 		local hulls = (shape_b :: types.MeshShape).hulls
@@ -276,11 +276,11 @@ local function dispatch_mpr_mesh_primitive<T, U>(
 			local hull_cf = cframe_a * CFrame.new(hull.offset * hull.scale)
 			local hit, normal, depth, point_a, point_b = mpr.intersects(hull_cf, hull, cframe_b, shape_b, in_tolerance)
 			if hit then
-				table.insert(out, {normal = -normal, depth = depth :: number, point_a = point_b :: Vector3, point_b = point_a :: Vector3, hull_a_id = hull_id})
+				table.insert(out, {normal = normal, depth = depth :: number, point_a = point_a :: Vector3, point_b = point_b :: Vector3, hull_a_id = hull_id})
 			end
 		end
 	end
-	
+
 	return out
 end
 
@@ -291,7 +291,7 @@ local function dispatch_mpr_mesh_mesh<T, U>(cframe_a: CFrame,
 	in_tolerance: number
 ): {{normal: Vector3, depth: number, point_a: Vector3, point_b: Vector3, hull_a_id: number, hull_b_id: number}}
 	local out = {}
-	
+
 	local hulls_a = (shape_a :: types.MeshShape).hulls
 	local hulls_b = (shape_b :: types.MeshShape).hulls
 	local local_tree_b = (shape_b :: types.MeshShape).local_tree
@@ -307,7 +307,7 @@ local function dispatch_mpr_mesh_mesh<T, U>(cframe_a: CFrame,
 			end
 		end
 	end
-	
+
 	return out
 end
 

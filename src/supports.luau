@@ -5,7 +5,6 @@
 local types = require("./types")
 local constants = require("./constants")
 
-local FLT_EPSILON = constants.FLT_EPSILON
 local HUGE_VECTOR = Vector3.one * constants.HUGE
 
 local V_X = Vector3.xAxis
@@ -22,7 +21,7 @@ end
 
 local function sphere(shape: types.SphereShape, direction: Vector3): Vector3
 	local len = vector.magnitude(direction :: any)
-	if len > FLT_EPSILON then
+	if len > 0 then
 		return (direction / len) * shape.radius
 	end
 	return Vector3.new(0, shape.radius, 0)
@@ -35,7 +34,7 @@ local function capsule(shape: types.CapsuleShape, direction: Vector3): Vector3
 	local pole_offset = (proj >= 0 and half_height or -half_height) * V_X
 
 	local mag = vector.magnitude(direction :: any)
-	if mag < FLT_EPSILON then
+	if mag == 0 then
 		return pole_offset
 	end
 
@@ -50,7 +49,7 @@ local function cylinder(shape: types.CylinderShape, direction: Vector3): Vector3
 
 	local len = (dy * dy + dz * dz)^.5
 
-	if len > FLT_EPSILON then
+	if len > 0 then
 		local scale = radius / len
 		dy *= scale
 		dz *= scale
@@ -102,12 +101,12 @@ local function hull(shape: types.HullShape, direction: Vector3): Vector3
 	local verts = shape.vertices
 	local adjacency = shape.adjacency
 	local scale = shape.scale
-	
-	direction /= scale
-	
+
+	direction *= scale
+
 	local best_i = 1
 	local best_dot = vector.dot(verts[1] :: any, direction :: any)
-	
+
 	local improved = true
 	while improved do
 		improved = false
@@ -121,7 +120,7 @@ local function hull(shape: types.HullShape, direction: Vector3): Vector3
 			end
 		end
 	end
-	
+
 	return verts[best_i] * scale
 end
 
@@ -130,7 +129,7 @@ local function ellipsoid(shape: types.EllipsoidShape, direction: Vector3): Vecto
 	local scaled_dir = direction * half_extents
 	local len = vector.magnitude(scaled_dir :: any)
 
-	if len < FLT_EPSILON then
+	if len == 0 then
 		return Vector3.new(0, half_extents.Y, 0)
 	end
 

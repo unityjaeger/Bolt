@@ -16,8 +16,6 @@ local UP = Vector3.yAxis
 local RIGHT = Vector3.xAxis
 local LOOK = Vector3.zAxis
 
-local DEFAULT_CONVEX_RADIUS = .05
-
 export type Shape = types.Shape
 export type BoxShape = types.BoxShape
 export type SphereShape = types.SphereShape
@@ -37,49 +35,44 @@ export type DynamicTree = types.DynamicTree
 export type StaticTree = types.StaticTree
 export type DynamicTreeConfig = types.DynamicTreeConfig
 
-local function create_box(size: Vector3, convex_radius: number?): types.BoxShape
+local function create_box(size: Vector3): types.BoxShape
 	return {
 		type = shape_map.BOX,
-		half_extents = size / 2,
-		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
+		half_extents = size / 2
 	}	
 end
 
-local function create_sphere(radius: number, convex_radius: number?): types.SphereShape
+local function create_sphere(radius: number): types.SphereShape
 	return {
 		type = shape_map.SPHERE,
-		radius = radius,
-		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
+		radius = radius
 	}
 end
 
-local function create_ellipsoid(size: Vector3, convex_radius: number?): types.EllipsoidShape
+local function create_ellipsoid(size: Vector3): types.EllipsoidShape
 	return {
 		type = shape_map.ELLIPSOID,
-		half_extents = size / 2,
-		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
+		half_extents = size / 2
 	}
 end
 
-local function create_capsule(radius: number, height: number, convex_radius: number?): types.CapsuleShape
+local function create_capsule(radius: number, height: number): types.CapsuleShape
 	return {
 		type = shape_map.CAPSULE,
 		radius = radius,
-		half_height = height / 2,
-		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
+		half_height = height / 2
 	}
 end
 
-local function create_cylinder(radius: number, height: number, convex_radius: number?): types.CylinderShape
+local function create_cylinder(radius: number, height: number): types.CylinderShape
 	return {
 		type = shape_map.CYLINDER,
 		radius = radius,
-		half_height = height / 2,
-		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
+		half_height = height / 2
 	}
 end
 
-local function create_wedge(size: Vector3, convex_radius: number?): types.WedgeShape
+local function create_wedge(size: Vector3): types.WedgeShape
 	local half_extents = size / 2	
 
 	local hx, hy, hz = half_extents.X, half_extents.Y, half_extents.Z
@@ -97,12 +90,11 @@ local function create_wedge(size: Vector3, convex_radius: number?): types.WedgeS
 		vertices = {v1, v2, v3},
 		local_slope = vector.normalize(vector.create(0, hz, -hy)) :: any,
 		local_edge = vector.normalize(vector.create(0, hy, hz)) :: any,
-		half_extents = half_extents,
-		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
+		half_extents = half_extents
 	}
 end
 
-local function create_corner_wedge(size: Vector3, convex_radius: number?): types.CornerWedgeShape
+local function create_corner_wedge(size: Vector3): types.CornerWedgeShape
 	local half_extents = size / 2	
 
 	local hx, hy, hz = half_extents.X, half_extents.Y, half_extents.Z
@@ -125,12 +117,11 @@ local function create_corner_wedge(size: Vector3, convex_radius: number?): types
 		local_edge1 = vector.normalize(vector.create(0, hy, -hz)) :: any,
 		local_edge2 = vector.normalize(vector.create(hx, hy, 0)) :: any,
 		local_edge3 = vector.normalize(vector.create(hx, hy, -hz)) :: any,
-		half_extents = half_extents,
-		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
+		half_extents = half_extents
 	}
 end
 
-local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vector3, convex_radius: number?): types.MeshShape
+local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vector3): types.MeshShape
 	local hull_shapes = {}
 
 	local scale = size / mesh_info.size
@@ -141,14 +132,13 @@ local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vect
 			vertices = v.vertices,
 			offset = v.offset,
 			adjacency = v.adjacency,
-			scale = scale,
-			convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
+			scale = scale
 		}
 	end
 
 	local local_tree = aabb_tree.new_static()
 	for i, hull in hull_shapes do
-		local_tree:insert(i, CFrame.new(hull.offset), hull)
+		local_tree:insert(i, CFrame.new(hull.offset * scale), hull)
 	end
 	local_tree:full_rebuild()
 
@@ -157,8 +147,7 @@ local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vect
 		hulls = hull_shapes,
 		local_tree = local_tree,
 		half_extents = size / 2,
-		original_half_extents = mesh_info.size / 2,
-		convex_radius = convex_radius or DEFAULT_CONVEX_RADIUS
+		original_half_extents = mesh_info.size / 2
 	}
 end
 
@@ -177,12 +166,12 @@ local function resize_mesh(mesh: MeshShape, size: Vector3)
 
 	local_tree:clear()
 	for i, hull in hulls do
-		local_tree:insert(i, CFrame.new(hull.offset), hull)
+		local_tree:insert(i, CFrame.new(hull.offset * scale), hull)
 	end
 	local_tree:full_rebuild()
 end
 
-local function create_from_part(part: BasePart, convex_radius: number?): types.Shape
+local function create_from_part(part: Part | MeshPart | UnionOperation): types.Shape
 	if part:IsA("MeshPart") or part:IsA("UnionOperation") then
 		error("meshes and unions cannot be created from parts")
 	elseif part:IsA("Part") then
@@ -190,28 +179,28 @@ local function create_from_part(part: BasePart, convex_radius: number?): types.S
 		local size = part.Size
 
 		if shape == Enum.PartType.Block then
-			return create_box(size, convex_radius)
+			return create_box(size)
 		elseif shape == Enum.PartType.Ball then
 			local sx, sy, sz = size.X, size.Y, size.Z
 			if sx ~= sy or sx ~= sz or sy ~= sz then
-				return create_ellipsoid(size, convex_radius)
+				return create_ellipsoid(size)
 			end
-			return create_sphere(sx/2, convex_radius)
+			return create_sphere(sx/2)
 		elseif shape == Enum.PartType.Cylinder then
 			local sx, sy, sz = size.X, size.Y, size.Z
 			if sy ~= sz then
 				error("cylinder does not have a consistent radius")
 			end
-			return create_cylinder(sy/2, sx, convex_radius)
+			return create_cylinder(sy/2, sx)
 		elseif shape == Enum.PartType.Wedge then
-			return create_wedge(size, convex_radius)
+			return create_wedge(size)
 		elseif shape == Enum.PartType.CornerWedge then
-			return create_corner_wedge(size, convex_radius)
+			return create_corner_wedge(size)
 		else
 			error("just so the type engine shuts up")
 		end
 	else
-		error("got unsupported instance type" .. part.ClassName)
+		error("got unsupported instance type " .. part.ClassName)
 	end
 end
 
