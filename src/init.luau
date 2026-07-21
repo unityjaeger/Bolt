@@ -171,7 +171,7 @@ local function resize_mesh(mesh: MeshShape, size: Vector3)
 	local_tree:full_rebuild()
 end
 
-local function create_from_part(part: Part | MeshPart | UnionOperation): types.Shape
+local function create_from_part(part: Part): types.Shape
 	if part:IsA("MeshPart") or part:IsA("UnionOperation") then
 		error("meshes and unions cannot be created from parts")
 	elseif part:IsA("Part") then
