@@ -24,10 +24,14 @@ bolt.gjk.intersects(
 
 The second return value of this function is the separating vector, which can be fed into the algorithm in the next call as the initial guess.
 
-# Casts
-Both shapecasting and raycasting is possible with GJK.
+Exact touching counts as an intersection.
 
-All GJK cast functions share the property that when the cast starts with the shape or ray inside of the object it is casting against, the distance will be `0` and the hit normal should not be used.
+# Casts
+Both shapecasting and raycasting are possible with GJK. Cast directions are finite displacement vectors, not infinite rays. Tangent contacts and contacts at the endpoint are included.
+
+If a cast starts touching or overlapping its target, its distance is `0`. Cast functions that return a normal return `Vector3.zero` for every such `t == 0` hit, that normal must not be used.
+
+A zero-motion cast hits when the initial shapes are considered touching or overlapping under the supplied tolerance and misses otherwise.
 
 To raycast, use
 ```luau
@@ -39,7 +43,7 @@ bolt.gjk.raycast(
     in_tolerance: number
 ): (Vector3?, number?, Vector3?)
 ```
-The return values in order are hit point, distance and hit normal. 
+The return values in order are hit point, distance and hit normal. The distance is measured in world-space units along the cast, not returned as a fraction of `ray_direction`.
 
 If the hit point is `nil`, then the other two return values will also be `nil`.
 
@@ -67,6 +71,8 @@ bolt.gjk.shapecast(
 ): (Vector3?, number?, Vector3?)
 ```
 For the return values, the same properties as with raycast return values apply.
+
+`shapecast_simple` and `shapecast` use identical, exact shape geometry without convex radius padding. They should agree on hit status and world-space hit distance within numerical precision.
 
 :::caution
 The hit normal that `shapecast` returns will not necessarily be perpendicular to the face that the shapecast hit, this mostly happens around vertices and edges.

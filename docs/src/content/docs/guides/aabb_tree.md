@@ -46,7 +46,7 @@ It's fine to call this every frame as it will not trigger a reinsertion if the o
 ```luau
 tree:resize(id: number, shape: Shape)
 ```
-Updates the actual shape information, use this when the shape information changes in any way.
+Updates the actual shape information, use this when the shape information changes in any way. On a dynamic tree, the replacement AABB retains the configured `aabb_padding`.
 
 ### Querying
 All query functions return an array of `id`'s whose AABB overlap the query volume. These are only candidates. You still need to run a narrow phase check against each candidate to make sure they really are intersecting.
@@ -64,12 +64,16 @@ Returns all `id`'s whose AABB overlaps the AABB constructed from `cf` and `shape
 ```luau
 tree:query_ray(ray_origin: Vector3, ray_direction: Vector3): {number}
 ```
-Returns all `id`'s whose AABB is hit by the ray.
+Returns all `id`'s whose AABB is hit by the finite segment from `ray_origin` to `ray_origin + ray_direction`.
 
 ```luau
-tree:query_shapecast(start: CFrame, direction: Vector3, shape: Shape): {number}
+tree:query_shapecast(shape: Shape, origin: CFrame, direction: Vector3): {number}
 ```
-Returns all `id`'s whose AABB is hit by the shapecast.
+Returns all `id`'s whose AABB is hit while sweeping the shape's world AABB through `direction`. The sweep starts at the actual center of the AABB computed from `shape` and `origin`, which is not necessarily `origin.Position`.
+
+Ray and shapecast queries include candidates touched at the segment endpoint. With a zero direction they act as point or stationary-AABB queries. A ray parallel to an AABB boundary is included when its origin lies on that boundary.
+
+Shape bounds account for rotated ellipsoids. Hull bounds use the supplied transform and the hull's component-wise scale, so transformed and non-uniformly scaled hulls can be inserted and queried correctly.
 
 :::tip
 If you want to generalize the narrow phase check after a query, you can look at the `type` field stored in the shape table. To figure out the collision function thats needed, look at [shape_map](https://github.com/unityjaeger/Bolt/blob/main/src/shape_map.luau) for the mapping. If you are using GJK or MPR, its even easier as both already work on generalized shapes.
@@ -92,6 +96,8 @@ tree:partial_rebuild() -> number
 tree:full_rebuild() -> number
 ```
 These methods are for rebuilding the tree, full_rebuild fully tears down the tree and reconstructs it while partial_rebuild reuses good branches to perform less work.
+
+On an empty tree, `full_rebuild()` and `partial_rebuild()` return `0`, and `should_rebuild()` returns `false`.
 
 For a dynamic tree you want to be using partial_rebuild mainly.
 

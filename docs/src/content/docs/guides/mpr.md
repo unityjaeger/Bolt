@@ -22,7 +22,11 @@ bolt.mpr.intersects(
 ): (boolean, Vector3, number?, Vector3?, Vector3?)
 ```
 
-This function will give you a boolean to indicate whether or not an intersection has happened, the minimum translation vector, penetration depth, the intersection point on shape A and lastly the intersection point on shape B in that order.
+This function returns, in order, whether an intersection occurred, the minimum-translation direction, penetration depth, the contact point on shape A, and the contact point on shape B. The normal points from shape B toward shape A, so moving shape A by `normal * depth` separates the pair. `point_a` and `point_b` always correspond to the function arguments with the same suffix.
+
+Swapping shapes A and B flips the normal and swaps `point_a` with `point_b`, subject to normal floating-point differences. Exact touching is a hit with a depth of `0` and a `Vector3.zero` normal, that normal must not be used.
+
+`in_tolerance` is a world-space distance with a minimum effective value of `1e-6`. Inputs below `1e-6` are raised to that minimum.
 
 The minimum translation vector will always be returned, and it can be used to quickly check if the two objects are still separated to dramatically speed up intersection tests in cases where objects generally don't move a lot inbetween calls.
 
@@ -38,3 +42,5 @@ bolt.mpr.is_separated(
     cached_normal: Vector3 --previously returned MTV
 ): boolean
 ```
+
+`is_separated` returns `false` when the shapes are touching. Pass a usable separating normal from an earlier result, the zero normal returned for a touching contact is not suitable as `cached_normal`.

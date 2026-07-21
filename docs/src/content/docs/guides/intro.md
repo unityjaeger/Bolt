@@ -27,8 +27,14 @@ Mesh support for all GJK and MPR functions through convex hulls.
 - ...and more
 
 # Conventions
-All casting functions expect the ray direction to already be scaled by the cast length.
+Cast directions describe finite displacement segments. A cast starts at its supplied origin or transform and ends after the complete direction vector has been applied.
 
-All GJK functions and the MPR `intersects` function take in an `in_tolerance` value, this describes the minimum distance between two objects before they count as colliding. Typically you want this small, unless you are working with really large objects. For most operations a sensible value can be anywhere between `1e-3` and `1e-4`. For MPR the tolerance is capped to `1e-6` as lower tolerances don't yield any better results, however for the vast majority of use cases you are gonna be fine with a tolerance of `1e-3` or `1e-4`.
+All casting functions include hits at that endpoint.
+
+All intersection functions count exact touching contacts as collision.
+
+All GJK functions and the MPR `intersects` function take an `in_tolerance` value. Pass a nonnegative world-space distance. GJK uses it as the contact distance, while MPR clamps it to a minimum effective value of `1e-6`. Typically you want this small unless you are working with very large objects. For most operations, a value between `1e-4` and `1e-3` is sensible.
+
+A GJK tolerance of `0` does not disable floating-point convergence handling.
 
 There are quite a few things to note with meshes, which will be talked about in the `Meshes` section.

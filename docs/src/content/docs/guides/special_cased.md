@@ -16,14 +16,16 @@ bolt.collision.box_box(
 ): boolean
 ```
 
-This simply tells you if these two objects are intersecting or not.
+Touching primitive pairs will return `true`.
 
 The remaining functions that have been special-cased are `box_sphere`, `box_capsule`, `sphere_sphere`, `sphere_capsule` and `capsule_capsule`.
 
 # Raycasting
-All special-cased raycasting functions have the same parameters and return values, the return values being the hit point, distance, hit normal and a boolean that indicates whether or not the ray started inside of the object.
+All special-cased raycasting functions have the same parameters and return values: hit point, world-space distance, and hit normal.
 
-When the ray starts inside of the object, the normal will point inwards instead of outwards, while the hit point and distance are still what you would expect: A point and the distance to this point on the surface of the object.
+When the ray starts on the surface or inside the object, the hit point is the ray origin, the distance is `0`, and the normal is `Vector3.zero` and must not be used.
+
+The direction describes a finite segment, and a hit at its endpoint is included. A zero-length ray acts as a point query: it hits if its origin is on or inside the shape and misses otherwise.
 
 One example for a special-cased raycast function is
 ```luau
@@ -32,7 +34,7 @@ bolt.raycast.box(
     ray_direction: Vector3,
     box_cf: CFrame,
     box_shape: BoxShape
-): (Vector3?, number?, Vector3?, boolean?)
+): (Vector3?, number?, Vector3?)
 ```
 
 If the hit point is `nil`, all other return values will also be `nil`.

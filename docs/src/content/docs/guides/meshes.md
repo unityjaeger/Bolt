@@ -3,7 +3,7 @@ title: Meshes
 description: Introduction to Meshes.
 ---
 
-MPR and GJK only work with convevx shapes, so to work with arbitrary meshes need to be decomposed into convex hulls. So a mesh will end up consisting of multiple convex hulls that approximate the original shape while also being much more performant than if one were to use the raw geometry of the mesh.
+MPR and GJK only work with convex shapes, so arbitrary meshes need to be decomposed into convex hulls. A mesh therefore consists of multiple convex hulls that approximate the original shape while also being much more performant than using its raw geometry.
 
 Meshes are supported through this [Plugin](https://create.roblox.com/store/asset/114210433179837/Collision-Hulls)
 
@@ -19,7 +19,7 @@ local hull_data = parser.Decode("ExampleMesh")
 
 local mesh_shape = bolt.create_mesh(hull_data, Vector3.new(5, 5, 5))
 ```
-The second argument is the mesh size.
+The second argument is the mesh size. It applies component-wise, non-uniform scale to every hull's vertices and offset. The mesh `CFrame` then transforms those scaled hulls into world space. Calling `resize_mesh` updates the hull scales and rebuilds the mesh's local AABB tree with the new offsets.
 
 Meshes have to be interacted with differently as they are not a single shape that can be easily worked with under the hood, but rather a set of convex hulls.
 
@@ -79,7 +79,7 @@ bolt.dispatch.gjk.shapecast(
 ): (Vector3?, number?, Vector3?)
 ```
 
-It is naturally possible to do mesh vs mesh raycasting or mesh vs mesh intersections would i would advise against this as it has to check every hull of `a` against every candidate hull of `b`, which can get expensive.
+Mesh-mesh intersections and both forms of mesh-mesh shapecast are supported, although they can be expensive because every hull of shape A must be checked against candidate hulls from shape B. Raycasting accepts a ray and one target shape, so "mesh-mesh raycasting" is not a two-shape operation, a mesh can simply be used as the raycast target.
 
 # MPR
 MPR works a bit differently from the rest, as you generally don't want to run the same logic for mesh vs primitive and mesh vs mesh. So it's split into exactly these two functions:
@@ -99,7 +99,9 @@ bolt.dispatch.mpr.mesh_primitive(
     hull_b_id: number?
 }}
 ```
-Compared to GJK, MPR will return all hulls that were intersected for further processing by the user. If `shape_a` was a mesh then `hull_b_id` will not be `nil` and if `shape_b` was a mesh then `hull_a_id` will not be `nil`.
+Compared to GJK, MPR returns all intersected hulls for further processing. IDs follow argument order: if `shape_a` is the mesh, `hull_a_id` identifies its hull, if `shape_b` is the mesh, `hull_b_id` identifies its hull. The ID for a primitive argument is `nil`.
+
+Normals and contact points also retain function argument order when the mesh is shape A: the normal points from shape B toward shape A, `point_a` belongs to the mesh hull, and `point_b` belongs to the primitive.
 
 ```luau
 bolt.dispatch.mpr.mesh_mesh(

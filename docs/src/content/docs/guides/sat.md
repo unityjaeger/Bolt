@@ -25,6 +25,8 @@ box_box(
 
 SAT will not give you an intersection point, if you need the contact manifold for physics simulation you will have to implement clipping yourself.
 
-The first return value indicates whether or not an intersection has occured, the second return value is the minimum translation vector and the third return value is the penetration depth.
+The first return value indicates whether or not an intersection has occurred, the second return value is the minimum-translation direction, and the third return value is the penetration depth. The normal points from shape B toward shape A, so moving shape A by `normal * depth` separates the pair.
 
-The rest of the SAT functions are `box_wedge`, `wedge_wedge`, `wedge_corner_wedge`, `box_corner_wedge` and `corner_wedge_corner_wedge`. 
+Exact touching returns `true` with a penetration depth of `0`.
+
+The rest of the SAT functions are `box_wedge`, `wedge_wedge`, `wedge_corner_wedge`, `box_corner_wedge` and `corner_wedge_corner_wedge`.
