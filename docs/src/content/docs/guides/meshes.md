@@ -23,6 +23,20 @@ The second argument is the mesh size. It applies component-wise, non-uniform sca
 
 Meshes have to be interacted with differently as they are not a single shape that can be easily worked with under the hood, but rather a set of convex hulls.
 
+## Single hulls
+If your geometry is already convex, a mesh is unnecessary overhead: it would carry a local AABB tree and a dispatch path built for choosing between hulls, for one hull. `bolt.create_hull` builds a lone hull instead, which behaves like any other primitive.
+
+```luau
+local hull_shape = bolt.create_hull({
+    vertices = vertices,
+    adjacency = adjacency,
+    size = Vector3.new(2, 2, 2),
+}, Vector3.new(4, 4, 4))
+```
+It takes the same `vertices` and `adjacency` a mesh hull carries, but no offset, since a standalone hull is positioned entirely by the `CFrame` you query it with. Unlike a mesh it goes through the ordinary `bolt.gjk` and `bolt.mpr` functions rather than `bolt.dispatch`, and it can be inserted into an AABB tree directly.
+
+Use `bolt.resize_hull(hull, size)` to rescale one.
+
 # GJK
 All already known GJK operations are possible against meshes.
 

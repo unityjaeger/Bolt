@@ -15,6 +15,16 @@ local tos = CF_IDENT.ToObjectSpace
 local vtos = CF_IDENT.VectorToObjectSpace
 local ptos = CF_IDENT.PointToObjectSpace
 
+--the closest hit queries report positions along the sweep as a fraction of the direction, while
+--gjk reports them as distances
+
+--converting needs the direction's length, and a zero length sweep
+--collapses every hit onto fraction 0, which is where a stationary cast happens
+local function fraction_scale(direction: Vector3): number
+	local length = vector.magnitude(direction :: any)
+	return if length > 0 then 1 / length else 0
+end
+
 local function dispatch_gjk_intersects<T, U>(
 	cframe_a: CFrame, 
 	shape_a: T & types.Shape, 
@@ -33,39 +43,43 @@ local function dispatch_gjk_intersects<T, U>(
 	elseif not is_mesh_a and is_mesh_b then
 		local in_b = tos(cframe_b, cframe_a)
 		local hulls = (shape_b :: types.MeshShape).hulls
-		for _, hull_id in (shape_b :: types.MeshShape).local_tree:query_shape(in_b, shape_a) do
+		local local_tree = (shape_b :: types.MeshShape).local_tree
+
+		return local_tree:query_shape_any(in_b, shape_a, function(hull_id: number): boolean
 			local hull = hulls[hull_id]
 			local hull_cf = cframe_b * CFrame.new(hull.offset * hull.scale)
 			local hit = gjk.intersects(cframe_a, shape_a, hull_cf, hull, in_tolerance)
-			if hit then
-				return true
-			end
-		end
+			return hit
+		end)
 	elseif is_mesh_a and not is_mesh_b then
 		local in_a = tos(cframe_a, cframe_b)
 		local hulls = (shape_a :: types.MeshShape).hulls
-		for _, hull_id in (shape_a :: types.MeshShape).local_tree:query_shape(in_a, shape_b) do
+		local local_tree = (shape_a :: types.MeshShape).local_tree
+
+		return local_tree:query_shape_any(in_a, shape_b, function(hull_id: number): boolean
 			local hull = hulls[hull_id]
 			local hull_cf = cframe_a * CFrame.new(hull.offset * hull.scale)
 			local hit = gjk.intersects(hull_cf, hull, cframe_b, shape_b, in_tolerance)
-			if hit then
-				return true
-			end
-		end
+			return hit
+		end)
 	else
 		local hulls_a = (shape_a :: types.MeshShape).hulls
 		local hulls_b = (shape_b :: types.MeshShape).hulls
 		local local_tree_b = (shape_b :: types.MeshShape).local_tree
+
 		for _, hull_a in hulls_a do
 			local hull_a_cf = cframe_a * CFrame.new(hull_a.offset * hull_a.scale)
 			local in_b = tos(cframe_b, hull_a_cf)
-			for _, hull_b_id in local_tree_b:query_shape(in_b, hull_a) do
+
+			local hit = local_tree_b:query_shape_any(in_b, hull_a, function(hull_b_id: number): boolean
 				local hull_b = hulls_b[hull_b_id]
 				local hull_b_cf = cframe_b * CFrame.new(hull_b.offset * hull_b.scale)
 				local hit = gjk.intersects(hull_a_cf, hull_a, hull_b_cf, hull_b, in_tolerance)
-				if hit then
-					return true
-				end
+				return hit
+			end)
+
+			if hit then
+				return true
 			end
 		end
 	end
@@ -90,19 +104,28 @@ local function dispatch_gjk_raycast<T, U>(
 		return gjk.raycast(ray_origin, ray_direction, cframe, shape, in_tolerance)
 	else
 		local hulls = (shape :: types.MeshShape).hulls
+		local local_tree = (shape :: types.MeshShape).local_tree
 		local local_origin = ptos(cframe, ray_origin)
 		local local_direction = vtos(cframe, ray_direction)
-		for _, hull_id in (shape :: types.MeshShape).local_tree:query_ray(local_origin, local_direction) do
+		local inv_length = fraction_scale(ray_direction)
+
+		local_tree:query_ray_closest(local_origin, local_direction, function(hull_id: number): number?
 			local hull = hulls[hull_id]
 			local hull_cf = cframe * CFrame.new(hull.offset * hull.scale)
 			local point, distance, normal = gjk.raycast(ray_origin, ray_direction, hull_cf, hull, in_tolerance)
-			if distance and distance < best_distance then
+			if distance == nil then
+				return nil
+			end
+
+			if distance < best_distance then
 				best_distance = distance
 				out_point = point
 				out_distance = distance
 				out_normal = normal
 			end
-		end
+
+			return distance * inv_length
+		end)
 	end
 
 	return out_point, out_distance, out_normal
@@ -127,47 +150,78 @@ local function dispatch_gjk_shapecast_simple<T, U>(
 		return gjk.shapecast_simple(cframe_a, direction, shape_a, cframe_b, shape_b, in_tolerance)
 	elseif not is_mesh_a and is_mesh_b then
 		local hulls = (shape_b :: types.MeshShape).hulls
+		local local_tree = (shape_b :: types.MeshShape).local_tree
 		local local_origin = tos(cframe_b, cframe_a)
 		local local_direction = vtos(cframe_b, direction)
-		for _, hull_id in (shape_b :: types.MeshShape).local_tree:query_shapecast(shape_a, local_origin, local_direction) do
+		local inv_length = fraction_scale(direction)
+
+		local_tree:query_shapecast_closest(shape_a, local_origin, local_direction, function(hull_id: number): number?
 			local hull = hulls[hull_id]
 			local hull_cf = cframe_b * CFrame.new(hull.offset * hull.scale)
 			local _, distance = gjk.shapecast_simple(cframe_a, direction, shape_a, hull_cf, hull, in_tolerance)
-			if distance and distance < best_distance then
+			if distance == nil then
+				return nil
+			end
+
+			if distance < best_distance then
 				best_distance = distance
 				out_distance = distance
 			end
-		end
+
+			return distance * inv_length
+		end)
 	elseif is_mesh_a and not is_mesh_b then
 		local hulls = (shape_a :: types.MeshShape).hulls
+		local local_tree = (shape_a :: types.MeshShape).local_tree
 		local local_origin = tos(cframe_a, cframe_b)
 		local local_direction = vtos(cframe_a, direction)
-		for _, hull_id in (shape_a :: types.MeshShape).local_tree:query_shapecast(shape_b, local_origin, -local_direction) do
+		local inv_length = fraction_scale(direction)
+
+		local_tree:query_shapecast_closest(shape_b, local_origin, -local_direction, function(hull_id: number): number?
 			local hull = hulls[hull_id]
 			local hull_cf = cframe_a * CFrame.new(hull.offset * hull.scale)
 			local _, distance = gjk.shapecast_simple(hull_cf, direction, hull, cframe_b, shape_b, in_tolerance)
-			if distance and distance < best_distance then
+			if distance == nil then
+				return nil
+			end
+
+			if distance < best_distance then
 				best_distance = distance
 				out_distance = distance
 			end
-		end
+
+			return distance * inv_length
+		end)
 	else
 		local hulls_a = (shape_a :: types.MeshShape).hulls
 		local hulls_b = (shape_b :: types.MeshShape).hulls
 		local local_tree_b = (shape_b :: types.MeshShape).local_tree
+		local inv_length = fraction_scale(direction)
+
 		for hull_a_id, hull_a in hulls_a do
 			local hull_a_cf = cframe_a * CFrame.new(hull_a.offset * hull_a.scale)
 			local local_origin = tos(cframe_b, hull_a_cf)
 			local local_direction = vtos(cframe_b, direction)
-			for _, hull_b_id in local_tree_b:query_shapecast(hull_a, local_origin, local_direction) do
+
+			--each hull of a runs its own query, so feed the best hit found so far back in as a cap
+			--and later hulls prune against it instead of restarting from the full sweep
+			local seed = if best_distance < HUGE then best_distance * inv_length else 1
+
+			local_tree_b:query_shapecast_closest(hull_a, local_origin, local_direction, function(hull_b_id: number): number?
 				local hull_b = hulls_b[hull_b_id]
 				local hull_b_cf = cframe_b * CFrame.new(hull_b.offset * hull_b.scale)
 				local _, distance = gjk.shapecast_simple(hull_a_cf, direction, hull_a, hull_b_cf, hull_b, in_tolerance)
-				if distance and distance < best_distance then
+				if distance == nil then
+					return nil
+				end
+
+				if distance < best_distance then
 					best_distance = distance
 					out_distance = distance
 				end
-			end
+
+				return distance * inv_length
+			end, seed)
 		end
 	end
 
@@ -192,53 +246,84 @@ local function dispatch_gjk_shapecast<T, U>(
 		return gjk.shapecast(cframe_a, direction, shape_a, cframe_b, shape_b, in_tolerance)
 	elseif not is_mesh_a and is_mesh_b then
 		local hulls = (shape_b :: types.MeshShape).hulls
+		local local_tree = (shape_b :: types.MeshShape).local_tree
 		local local_origin = tos(cframe_b, cframe_a)
 		local local_direction = vtos(cframe_b, direction)
-		for _, hull_id in (shape_b :: types.MeshShape).local_tree:query_shapecast(shape_a, local_origin, local_direction) do
+		local inv_length = fraction_scale(direction)
+
+		local_tree:query_shapecast_closest(shape_a, local_origin, local_direction, function(hull_id: number): number?
 			local hull = hulls[hull_id]
 			local hull_cf = cframe_b * CFrame.new(hull.offset * hull.scale)
 			local point, distance, normal = gjk.shapecast(cframe_a, direction, shape_a, hull_cf, hull, in_tolerance)
-			if distance and distance < best_distance then
+			if distance == nil then
+				return nil
+			end
+
+			if distance < best_distance then
 				best_distance = distance
 				out_distance = distance
 				out_point = point
 				out_normal = normal
 			end
-		end
+
+			return distance * inv_length
+		end)
 	elseif is_mesh_a and not is_mesh_b then
 		local hulls = (shape_a :: types.MeshShape).hulls
+		local local_tree = (shape_a :: types.MeshShape).local_tree
 		local local_origin = tos(cframe_a, cframe_b)
 		local local_direction = vtos(cframe_a, direction)
-		for _, hull_id in (shape_a :: types.MeshShape).local_tree:query_shapecast(shape_b, local_origin, -local_direction) do
+		local inv_length = fraction_scale(direction)
+
+		local_tree:query_shapecast_closest(shape_b, local_origin, -local_direction, function(hull_id: number): number?
 			local hull = hulls[hull_id]
 			local hull_cf = cframe_a * CFrame.new(hull.offset * hull.scale)
 			local point, distance, normal = gjk.shapecast(hull_cf, direction, hull, cframe_b, shape_b, in_tolerance)
-			if distance and distance < best_distance then
+			if distance == nil then
+				return nil
+			end
+
+			if distance < best_distance then
 				best_distance = distance
 				out_distance = distance
 				out_point = point
 				out_normal = normal
 			end
-		end
+
+			return distance * inv_length
+		end)
 	else
 		local hulls_a = (shape_a :: types.MeshShape).hulls
 		local hulls_b = (shape_b :: types.MeshShape).hulls
 		local local_tree_b = (shape_b :: types.MeshShape).local_tree
+		local inv_length = fraction_scale(direction)
+
 		for hull_a_id, hull_a in hulls_a do
 			local hull_a_cf = cframe_a * CFrame.new(hull_a.offset * hull_a.scale)
 			local local_origin = tos(cframe_b, hull_a_cf)
 			local local_direction = vtos(cframe_b, direction)
-			for _, hull_b_id in local_tree_b:query_shapecast(hull_a, local_origin, local_direction) do
+
+			--each hull of a runs its own query, so feed the best hit found so far back in as a cap
+			--and later hulls prune against it instead of restarting from the full sweep
+			local seed = if best_distance < HUGE then best_distance * inv_length else 1
+
+			local_tree_b:query_shapecast_closest(hull_a, local_origin, local_direction, function(hull_b_id: number): number?
 				local hull_b = hulls_b[hull_b_id]
 				local hull_b_cf = cframe_b * CFrame.new(hull_b.offset * hull_b.scale)
 				local point, distance, normal = gjk.shapecast(hull_a_cf, direction, hull_a, hull_b_cf, hull_b, in_tolerance)
-				if distance and distance < best_distance then
+				if distance == nil then
+					return nil
+				end
+
+				if distance < best_distance then
 					best_distance = distance
 					out_distance = distance
 					out_point = point
 					out_normal = normal
 				end
-			end
+
+				return distance * inv_length
+			end, seed)
 		end
 	end
 

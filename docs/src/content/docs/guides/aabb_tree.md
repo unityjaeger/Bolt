@@ -49,7 +49,7 @@ tree:resize(id: number, shape: Shape)
 Updates the actual shape information, use this when the shape information changes in any way. On a dynamic tree, the replacement AABB retains the configured `aabb_padding`.
 
 ### Querying
-All query functions return an array of `id`'s whose AABB overlap the query volume. These are only candidates. You still need to run a narrow phase check against each candidate to make sure they really are intersecting.
+The `query_aabb`, `query_shape`, `query_ray` and `query_shapecast` functions return an array of `id`'s whose AABB overlap the query volume. These are only candidates. You still need to run a narrow phase check against each candidate to make sure they really are intersecting. The `_closest` and `_any` variants documented below resolve the answer during the traversal instead, and hand you a result rather than a list.
 
 ```luau
 tree:query_aabb(min: Vector3, max: Vector3): {number}
@@ -62,14 +62,92 @@ tree:query_shape(cf: CFrame, shape: Shape): {number}
 Returns all `id`'s whose AABB overlaps the AABB constructed from `cf` and `shape`.
 
 ```luau
+tree:query_aabb_any(min: Vector3, max: Vector3, callback: (id: number) -> boolean): boolean
+```
+```luau
+tree:query_shape_any(cf: CFrame, shape: Shape, callback: (id: number) -> boolean): boolean
+```
+Returns `true` as soon as `callback` accepts a candidate, `false` if none do.
+
+Use these when you only need to know *whether* something overlaps, not what. Nothing is collected, and the traversal stops at the first accepted candidate, so neither the rest of the tree nor the remaining candidates cost anything. `callback` is your narrow phase and returns `true` for a real hit.
+
+```luau
+local blocked = tree:query_shape_any(cf, shape, function(id)
+    local obj = objects[id]
+    return bolt.gjk.intersects(cf, shape, obj.cf, obj.shape, 1e-4)
+end)
+```
+
+```luau
 tree:query_ray(ray_origin: Vector3, ray_direction: Vector3): {number}
 ```
 Returns all `id`'s whose AABB is hit by the finite segment from `ray_origin` to `ray_origin + ray_direction`.
 
 ```luau
+tree:query_ray_closest(
+    ray_origin: Vector3,
+    ray_direction: Vector3,
+    narrow_phase: (id: number, max_fraction: number) -> number?,
+    max_fraction: number?
+): (number?, number?)
+```
+Returns the single closest hit along the segment, as `(id, fraction)`, or `nil` if nothing was hit.
+
+This is the one query that does not hand you a candidate list. It walks the tree front to back and calls `narrow_phase` on each leaf it reaches, which lets it skip entire subtrees that begin further away than the closest hit found so far. `query_ray` cannot do this, because it has to return every candidate the segment touches whether or not something closer was already found.
+
+`narrow_phase` receives the candidate's `id` and the closest fraction found so far, and returns the hit as a fraction of `ray_direction` (`0` is at `ray_origin`, `1` is at `ray_origin + ray_direction`), or `nil` for a miss. If your narrow phase gives you a distance, divide it by the length of `ray_direction`. `max_fraction` is there so you can cut your own work short, anything you return beyond it is discarded regardless.
+
+Pruning only ever skips subtrees that cannot contain a closer hit, so you get the same answer a full scan would give. Hits at the very end of the segment count, and exact ties are broken arbitrarily.
+
+`max_fraction` defaults to `1`, the whole segment. Passing a smaller value caps the search: anything the ray reaches later is pruned before its narrow phase runs. Use it to carry a hit you already found elsewhere into this query, so several trees (or several queries against one tree) narrow the search together instead of each starting over:
+
+```luau
+local best_id, best_fraction = nil, 1
+for _, tree in trees do
+    local id, fraction = tree:query_ray_closest(origin, direction, narrow_phase, best_fraction)
+    if id then
+        best_id, best_fraction = id, fraction
+    end
+end
+```
+
+```luau
+local id, fraction = tree:query_ray_closest(origin, direction, function(id)
+    local obj = objects[id]
+    local _, distance = bolt.dispatch.gjk.raycast(origin, direction, obj.cf, obj.shape, 1e-4)
+    return if distance then distance / vector.magnitude(direction :: any) else nil
+end)
+```
+
+:::tip
+Prefer this over `query_ray` whenever you only care about the first thing hit. The number of candidates along a ray grows with how far it travels through the scene, so a `query_ray` closest hit loop gets steadily more expensive as the tree grows, while this stays close to `O(log n)`.
+:::
+
+```luau
 tree:query_shapecast(shape: Shape, origin: CFrame, direction: Vector3): {number}
 ```
 Returns all `id`'s whose AABB is hit while sweeping the shape's world AABB through `direction`. The sweep starts at the actual center of the AABB computed from `shape` and `origin`, which is not necessarily `origin.Position`.
+
+```luau
+tree:query_shapecast_closest(
+    shape: Shape,
+    origin: CFrame,
+    direction: Vector3,
+    narrow_phase: (id: number, max_fraction: number) -> number?,
+    max_fraction: number?
+): (number?, number?)
+```
+The sweeping counterpart to `query_ray_closest`: returns the single closest hit as `(id, fraction)`, or `nil` if nothing was hit.
+
+It behaves exactly like `query_ray_closest`: front to back traversal, `narrow_phase` called only on leaves it actually reaches, subtrees that begin beyond the closest hit skipped, and the same optional `max_fraction` cap, with the sweep volume in place of the ray. `narrow_phase` returns the hit as a fraction of `direction`, or `nil` for a miss, and the result is the same one a full scan of `query_shapecast` would produce.
+
+```luau
+local id, fraction = tree:query_shapecast_closest(shape, cf, direction, function(id)
+    local obj = objects[id]
+    local hit, distance = bolt.dispatch.gjk.shapecast_simple(cf, direction, shape, obj.cf, obj.shape, 1e-4)
+    return if hit and distance then distance / vector.magnitude(direction :: any) else nil
+end)
+```
 
 Ray and shapecast queries include candidates touched at the segment endpoint. With a zero direction they act as point or stationary-AABB queries. A ray parallel to an AABB boundary is included when its origin lies on that boundary.
 

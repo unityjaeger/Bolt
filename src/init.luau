@@ -29,7 +29,6 @@ export type Hull = types.Hull
 export type HullShape = types.HullShape
 export type Support<T = Shape> = types.Support<T>
 
-export type TreeNode = types.TreeNode
 export type Tree = types.Tree
 export type DynamicTree = types.DynamicTree
 export type StaticTree = types.StaticTree
@@ -125,6 +124,7 @@ local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vect
 	local hull_shapes = {}
 
 	local scale = size / mesh_info.size
+	local original_half_extents = mesh_info.size / 2
 
 	for i, v in mesh_info.hulls do
 		hull_shapes[i] = {
@@ -132,7 +132,8 @@ local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vect
 			vertices = v.vertices,
 			offset = v.offset,
 			adjacency = v.adjacency,
-			scale = scale
+			scale = scale,
+			original_half_extents = original_half_extents
 		}
 	end
 
@@ -149,6 +150,26 @@ local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vect
 		half_extents = size / 2,
 		original_half_extents = mesh_info.size / 2
 	}
+end
+
+local function create_hull(hull_info: {vertices: {Vector3}, adjacency: {{number}}, size: Vector3}, size: Vector3): types.HullShape
+	return {
+		type = shape_map.HULL,
+		vertices = hull_info.vertices,
+		adjacency = hull_info.adjacency,
+		--a standalone hull is placed entirely by the cframe it is queried with
+		--offset exists for mesh hulls, which sit at a fixed position relative to their mesh origin
+		--and nothing outside the mesh paths ever use it
+		offset = Vector3.zero,
+		scale = size / hull_info.size,
+		original_half_extents = hull_info.size / 2
+	}
+end
+
+local function resize_hull(hull: types.HullShape, size: Vector3)
+	--a hull has no local tree or cached extents to rebuild, its bounds come from the scaled
+	--vertices, so the scale is the only thing a resize has to touch
+	hull.scale = (size / 2) / hull.original_half_extents
 end
 
 local function resize_mesh(mesh: MeshShape, size: Vector3)
@@ -213,9 +234,11 @@ return {
 	create_wedge = create_wedge,
 	create_corner_wedge = create_corner_wedge,
 	create_mesh = create_mesh,
+	create_hull = create_hull,
 	create_from_part = create_from_part,
 
 	resize_mesh = resize_mesh,
+	resize_hull = resize_hull,
 
 	collision = {
 		box_box = box.box_box,

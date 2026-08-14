@@ -430,6 +430,46 @@ const function draw_corner_wedge(cframe: CFrame, shape: bolt.CornerWedgeShape)
 	reset_properties(restore_color, old_color, restore_transparency, old_transparency, restore_thickness, old_thickness)
 end
 
+const _hull_lines = table.create(64)
+const function draw_hull_internal(cframe: CFrame, shape: bolt.HullShape)
+	local vertices = shape.vertices
+	local adjacency = shape.adjacency
+	local scale = shape.scale
+
+	--every other buffer here has a fixed length, but a hull's edge count depends on the shape,
+	--so this one is emptied rather than overwritten in place
+	table.clear(_hull_lines)
+
+	local cursor = 1
+
+	for i, neighbours in adjacency do
+		local from = cframe * (vertices[i] * scale)
+
+		for _, j in neighbours do
+			--adjacency records both directions, so each edge is drawn from its lower index only
+			if j > i then
+				_hull_lines[cursor] = from
+				_hull_lines[cursor + 1] = cframe * (vertices[j] * scale)
+				cursor += 2
+			end
+		end
+	end
+
+	IMMEDIATE_WIREFRAME:AddLines(_hull_lines)
+end
+
+--the hull is drawn exactly where the collision functions see it, which means the caller supplies the transform
+
+--a mesh positions its hulls itself, so drawing one of those wants the composed
+--cframe: mesh_cframe * CFrame.new(hull.offset * hull.scale)
+const function draw_hull(cframe: CFrame, shape: bolt.HullShape)
+	local restore_color, old_color, restore_transparency, old_transparency, restore_thickness, old_thickness = consume_properties()
+
+	draw_hull_internal(cframe, shape)
+
+	reset_properties(restore_color, old_color, restore_transparency, old_transparency, restore_thickness, old_thickness)
+end
+
 const _cone_points = table.create(SPHERE_SEGMENTS)
 const _cone_lines = table.create(SPHERE_SEGMENTS * 2)
 const function draw_cone(base_center: Vector3, tip: Vector3, u: Vector3, v: Vector3, radius: number)
@@ -504,6 +544,8 @@ const function draw_primitive(cframe: CFrame, shape: bolt.Shape)
 		draw_corner_wedge(cframe, shape :: bolt.CornerWedgeShape)
 	elseif shape.type == 2^6 then
 		draw_capsule(cframe, shape :: bolt.CapsuleShape)
+	elseif shape.type == 2^7 then
+		draw_hull(cframe, shape :: bolt.HullShape)
 	elseif shape.type == 2^8 then
 		draw_ellipsoid(cframe, shape :: bolt.EllipsoidShape)
 	else
@@ -736,6 +778,7 @@ return {
 		ellipsoid = draw_ellipsoid,
 		wedge = draw_wedge,
 		corner_wedge = draw_corner_wedge,
+		hull = draw_hull,
 		
 		ray = draw_ray,
 		arrow = draw_arrow

@@ -55,36 +55,51 @@ export type MeshShape = Shape & {
 }
 
 export type HullShape = Shape & Hull & {
-	scale: Vector3
+	scale: Vector3,
+	original_half_extents: Vector3
 }
 
 export type Support<T = Shape> = (shape: T, direction: Vector3) -> Vector3
 
-export type TreeNode = {
-	aabb_min: vector,
-	aabb_max: vector,
-	parent: number,
-	child1: number,
-	child2: number,
-	height: number,
-	enlarged: boolean?,
-	id: number,
-	cf: CFrame,
-	shape: Shape
-}
-
 export type Tree = {
 	root: number,
-	nodes: {TreeNode},
+	node_count: number,
 	free_list: number,
+	aabb_min: {vector},
+	aabb_max: {vector},
+	parent: {number},
+	child1: {number},
+	child2: {number},
+	height: {number},
+	enlarged: {boolean},
+	id: {number},
+	cf: {CFrame},
+	shape: {Shape},
 	leaf_map: {number},
 	proxy_count: number,
 	base_cost_ratio: number?,
 	clear: (dyn_tree: Tree) -> (),
 	query_aabb: (tree: Tree, min: Vector3, max: Vector3) -> {number},
 	query_ray: (tree: Tree, ray_origin: Vector3, ray_direction: Vector3) -> {number},
+	query_ray_closest: (
+		tree: Tree,
+		ray_origin: Vector3,
+		ray_direction: Vector3,
+		narrow_phase: (id: number, max_fraction: number) -> number?,
+		max_fraction: number?
+	) -> (number?, number?),
 	query_shape: (tree: Tree, cframe: CFrame, shape: Shape) -> {number},
+	query_aabb_any: (tree: Tree, min: Vector3, max: Vector3, predicate: (id: number) -> boolean) -> boolean,
+	query_shape_any: (tree: Tree, cframe: CFrame, shape: Shape, predicate: (id: number) -> boolean) -> boolean,
 	query_shapecast: (tree: Tree, shape: Shape, origin: CFrame, direction: Vector3) -> {number},
+	query_shapecast_closest: (
+		tree: Tree,
+		shape: Shape,
+		origin: CFrame,
+		direction: Vector3,
+		narrow_phase: (id: number, max_fraction: number) -> number?,
+		max_fraction: number?
+	) -> (number?, number?),
 	full_rebuild: (tree: Tree) -> number
 }
 

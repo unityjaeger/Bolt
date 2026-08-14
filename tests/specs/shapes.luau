@@ -1,6 +1,95 @@
 --!strict
 
+local helpers = require(script.Parent.Parent.helpers)
+
 return function(t: any, bolt: any)
+	local function unit_cube_hull_info(): any
+		--a 1x1x1 hull, so a creation size of n scales it to an n sided cube
+		local unit = helpers.make_box_hull(Vector3.zero, Vector3.new(0.5, 0.5, 0.5))
+		return {
+			vertices = unit.vertices,
+			adjacency = unit.adjacency,
+			size = Vector3.new(1, 1, 1),
+		}
+	end
+
+	t.test("shapes/hull constructor scales and carries no offset", function()
+		local hull = bolt.create_hull(unit_cube_hull_info(), Vector3.new(2, 2, 2))
+
+		--a standalone hull is placed by the cframe it is queried with, never by an offset
+		t.vector_near(hull.offset, Vector3.zero)
+		t.vector_near(hull.scale, Vector3.new(2, 2, 2))
+		t.vector_near(hull.original_half_extents, Vector3.new(0.5, 0.5, 0.5))
+
+		local non_uniform = bolt.create_hull(unit_cube_hull_info(), Vector3.new(4, 1, 6))
+		t.vector_near(non_uniform.scale, Vector3.new(4, 1, 6))
+	end)
+
+	t.test("shapes/hull behaves like the equivalent box", function()
+		local hull = bolt.create_hull(unit_cube_hull_info(), Vector3.new(2, 2, 2))
+		local box = bolt.create_box(Vector3.new(2, 2, 2))
+		local cf = CFrame.new(3, -1, 2) * CFrame.fromOrientation(0.3, 0.7, -0.2)
+
+		--identical bounds mean no query can ever return one of them without the other
+		local tree = bolt.aabb_tree.new_static()
+		tree:insert(1, cf, hull)
+		tree:insert(2, cf, box)
+		tree:full_rebuild()
+
+		local random = Random.new(77)
+		for _ = 1, 40 do
+			local center = Vector3.new(random:NextNumber(-8, 8), random:NextNumber(-8, 8), random:NextNumber(-8, 8))
+			local half = Vector3.one * random:NextNumber(0.5, 3)
+
+			local has_hull, has_box = false, false
+			for _, id in tree:query_aabb(center - half, center + half) do
+				if id == 1 then
+					has_hull = true
+				elseif id == 2 then
+					has_box = true
+				end
+			end
+			t.equal(has_hull, has_box, "hull and box bounds disagree")
+		end
+
+		--and the narrow phase has to agree too
+		local sphere = bolt.create_sphere(1)
+		local probe = CFrame.new(4, -1, 2)
+		t.equal(bolt.gjk.intersects(cf, hull, probe, sphere, 0), bolt.gjk.intersects(cf, box, probe, sphere, 0))
+
+		local origin = Vector3.new(-10, -1, 2)
+		local direction = Vector3.new(30, 0, 0)
+		local hull_point, hull_distance = bolt.gjk.raycast(origin, direction, cf, hull, 0)
+		local box_point, box_distance = bolt.gjk.raycast(origin, direction, cf, box, 0)
+		t.near(t.non_nil(hull_distance), t.non_nil(box_distance), 1e-4)
+		t.vector_near(t.non_nil(hull_point), t.non_nil(box_point), 1e-4)
+	end)
+
+	t.test("shapes/resize_hull rescales from the original size", function()
+		local hull = bolt.create_hull(unit_cube_hull_info(), Vector3.new(2, 2, 2))
+
+		bolt.resize_hull(hull, Vector3.new(4, 4, 4))
+		t.vector_near(hull.scale, Vector3.new(4, 4, 4))
+
+		--scale is derived from the original size rather than the current one, so resizes do not
+		--compound the way repeatedly multiplying the existing scale would
+		bolt.resize_hull(hull, Vector3.new(2, 8, 3))
+		t.vector_near(hull.scale, Vector3.new(2, 8, 3))
+	end)
+
+	t.test("shapes/resized hull reaches its tree through resize", function()
+		local hull = bolt.create_hull(unit_cube_hull_info(), Vector3.new(2, 2, 2))
+		local tree = bolt.aabb_tree.new({aabb_padding = 0})
+		tree:insert(1, CFrame.identity, hull)
+
+		--half extent 1 while the hull is 2 wide, so this point sits outside it
+		local point = Vector3.new(1.8, 0, 0)
+		t.set_equal(tree:query_aabb(point, point), {})
+
+		bolt.resize_hull(hull, Vector3.new(6, 6, 6))
+		tree:resize(1, hull)
+		t.set_equal(tree:query_aabb(point, point), {1})
+	end)
 	t.test("shapes/primitive constructors store expected dimensions", function()
 		local box = bolt.create_box(Vector3.new(2, 4, 6))
 		local sphere = bolt.create_sphere(1.25)
