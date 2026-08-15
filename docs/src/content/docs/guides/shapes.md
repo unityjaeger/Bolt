@@ -49,6 +49,24 @@ The second argument scales it the same way mesh size does, component wise agains
 
 Mesh size applies component wise, non-uniform scaling to hull vertices and hull offsets.
 
+```luau
+bolt.resize_mesh(mesh: MeshShape, size: Vector3)
+```
+A resize method is specifically only needed for meshes and hulls as there is more work needed than a single value change. `resize_mesh` updates every hull's scale and rebuilds the mesh's local AABB tree with the scaled hull offsets.
+
+```luau
+bolt.resize_hull(hull: HullShape, size: Vector3)
+```
+Updates a standalone hull's scale. A hull has no local tree to rebuild, so this only touches the scale, but it exists so hulls resize through the same call shape as meshes rather than by writing `scale` yourself.
+
+:::note
+Resizing does not update any AABB tree the shape is registered in. Call `tree:resize(id, shape)` afterwards, exactly as you would for a mesh.
+:::
+
+:::note
+Capsules and cylinders both use the same alignment as cylinders in roblox, so cframe.RightVector is the axis, while size.X is the height and size.Y/2 is the radius.
+:::
+
 ## Margins
 Every shape has an optional `margin`, which inflates it by that distance in all directions, as if it were swept by a sphere of that radius.
 
@@ -80,21 +98,3 @@ Build the shape smaller when you need it smaller.
 :::
 
 Shapecasts otherwise use the exact supplied shape geometry.
-
-```luau
-bolt.resize_mesh(mesh: MeshShape, size: Vector3)
-```
-A resize method is specifically only needed for meshes and hulls as there is more work needed than a single value change. `resize_mesh` updates every hull's scale and rebuilds the mesh's local AABB tree with the scaled hull offsets.
-
-```luau
-bolt.resize_hull(hull: HullShape, size: Vector3)
-```
-Updates a standalone hull's scale. A hull has no local tree to rebuild, so this only touches the scale, but it exists so hulls resize through the same call shape as meshes rather than by writing `scale` yourself.
-
-:::note
-Resizing does not update any AABB tree the shape is registered in. Call `tree:resize(id, shape)` afterwards, exactly as you would for a mesh.
-:::
-
-:::note
-Capsules and cylinders both use the same alignment as cylinders in roblox, so cframe.RightVector is the axis, while size.X is the height and size.Y/2 is the radius.
-:::
