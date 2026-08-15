@@ -48,6 +48,8 @@ tree:resize(id: number, shape: Shape)
 ```
 Updates the actual shape information, use this when the shape information changes in any way. On a dynamic tree, the replacement AABB retains the configured `aabb_padding`.
 
+That includes `shape.margin`, which is easy to overlook because it is a single field rather than a resize call. A tree only reads a shape's size when the shape is inserted or resized, so a margin raised afterwards leaves the bounds too small and the tree can stop offering the shape as a candidate.
+
 ### Querying
 The `query_aabb`, `query_shape`, `query_ray` and `query_shapecast` functions return an array of `id`'s whose AABB overlap the query volume. These are only candidates. You still need to run a narrow phase check against each candidate to make sure they really are intersecting. The `_closest` and `_any` variants documented below resolve the answer during the traversal instead, and hand you a result rather than a list.
 

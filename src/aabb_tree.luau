@@ -117,7 +117,7 @@ local function swept_aabb(cast_min: vector, cast_max: vector, ray_inv_dir: Vecto
 	return tmin <= tmax
 end
 
-local function shape_aabb(cf: CFrame, shape: types.Shape): (vector, vector)
+local function unmargined_shape_aabb(cf: CFrame, shape: types.Shape): (vector, vector)
 	if shape.type == shape_map.BOX or shape.type == shape_map.MESH then
 		local half_extents = (shape :: types.BoxShape).half_extents
 		local center = cf.Position
@@ -231,6 +231,22 @@ local function shape_aabb(cf: CFrame, shape: types.Shape): (vector, vector)
 	else
 		error("unsupported shape")
 	end
+end
+
+--the broad phase has to agree with the narrow phase about how big a shape is, so a margin widens
+--the bounds too, without this the tree would filter out pairs that gjk and mpr would have found
+
+--only a positive margin counts, which is the same rule gjk and mpr apply, a negative one is not supported
+local function shape_aabb(cf: CFrame, shape: types.Shape): (vector, vector)
+	local min, max = unmargined_shape_aabb(cf, shape)
+	local margin = shape.margin
+
+	if margin == nil or margin <= 0 then
+		return min, max
+	end
+
+	local expand = vector.one * margin
+	return min - expand, max + expand
 end
 
 local function alloc(tree: Tree): number
@@ -1343,6 +1359,28 @@ local function build_tree(tree: Tree, leaf_count: number, leaf_indices: {number}
 	return root_index
 end
 
+--when every shape in a tree grows by the same distance, so does every node,
+--and a parent still contains a child that moved with it
+
+--that makes a uniform inflation a pass over the bounds rather
+--than a rebuild, no node changes place, so the topology it was built with stays valid
+
+--free list nodes are covered too, which costs nothing since allocation overwrites their bounds
+local function expand_bounds(tree: Tree, amount: number)
+	if amount <= 0 then
+		return
+	end
+
+	local aabb_min = tree.aabb_min
+	local aabb_max = tree.aabb_max
+	local expand = vector.one * amount
+
+	for index = 1, tree.node_count do
+		aabb_min[index] -= expand
+		aabb_max[index] += expand
+	end
+end
+
 local function compute_cost_ratio(tree: Tree): number
 	local aabb_min = tree.aabb_min
 	local aabb_max = tree.aabb_max
@@ -1612,5 +1650,6 @@ end
 
 return {
 	new_dynamic = new_dynamic_tree,
-	new_static = new_static_tree
+	new_static = new_static_tree,
+	expand_bounds = expand_bounds
 }

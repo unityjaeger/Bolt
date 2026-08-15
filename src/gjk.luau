@@ -25,6 +25,28 @@ local m_y = table.create(4) :: {Vector3}
 local m_p = table.create(4) :: {Vector3}
 local m_q = table.create(4) :: {Vector3}
 
+--inflating a convex shape by its margin moves every support point that far along the query
+--direction, which is exactly a minkowski sum with a sphere of that radius
+
+--it holds for every convex shape, hulls included
+
+--the support points themselves are offset rather than just the difference, so the simplex and the
+--witness points behind the returned contact point all sit on the inflated surface
+
+--only an exactly zero length direction has no direction to offset along, anything longer normalizes cleanly,
+--and a magnitude can only reach zero by underflowing the squares, which needs components small
+--enough that the division would be safe anyway, guarding any higher would drop the margin on the
+--short search directions gjk converges to
+local function margin_unit(direction: Vector3): Vector3
+	local length = vector.magnitude(direction :: any)
+
+	if length <= 0 then
+		return V_ZERO
+	end
+
+	return (direction / length) :: any
+end
+
 local function get_barycentric_coordinates_2d(in_a: Vector3, in_b: Vector3): (number, number)
 	local ab = in_b - in_a
 	local denominator = vector.dot(ab :: any, ab :: any)
@@ -407,10 +429,23 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 	local support_a = support_map[shape_a.type]
 	local support_b = support_map[shape_b.type]
 
+	--a is queried along io_v and b along -io_v, so their margins both push the difference the
+	--same way and can be applied as one step
+	
+	--each is clamped before they are added
+	
+	--a negative margin is ignored, so it must stop counting on its own shape
+	--rather than eat into the other shape's margin through the sum
+	local total_margin = math.max(0, shape_a.margin or 0) + math.max(0, shape_b.margin or 0)
+
 	while true do
 		local p = support_a(shape_a, io_v)
 		local q = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -io_v)))
 		local w = p - q
+
+		if total_margin > 0 then
+			w += margin_unit(io_v) * total_margin
+		end
 
 		if vector.dot(io_v :: any, w :: any) < 0 then
 			return false, io_v
@@ -455,6 +490,7 @@ local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, cframe: C
 	local tolerance_sq = in_tolerance * in_tolerance
 
 	local support = support_map[shape.type]
+	local margin = math.max(0, shape.margin or 0)
 
 	m_num_points = 0
 
@@ -465,11 +501,17 @@ local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, cframe: C
 	local allow_restart = false
 
 	--jolt keeps the separating axis from the previous converged simplex
+
 	--the current axis can be nearly zero at the hit and is not a stable normal
 	local prev_v = V_ZERO
 
 	while true do
 		local p = support(shape, v)
+
+		if margin > 0 then
+			p += margin_unit(v) * margin
+		end
+
 		local w = x - p
 
 		local v_dot_w = vector.dot(v :: any, w :: any)
@@ -537,6 +579,7 @@ local function raycast<T>(ray_origin: Vector3, ray_direction: Vector3, cframe: C
 	end
 
 	--a cast that never advanced started in contact
+	
 	--there is no separating axis in that case, so preserve the zero normal behavior
 	local prev_v_len_sq = vector.dot(prev_v :: any, prev_v :: any)
 	local out_normal =
@@ -557,6 +600,9 @@ local function shapecast_simple<T, U>(cframe_a: CFrame, direction: Vector3, shap
 	local support_a = support_map[shape_a.type]
 	local support_b = support_map[shape_b.type]
 
+	--b is queried along v and a along -v, so both margins inflate the difference the same way
+	local total_margin = math.max(0, shape_a.margin or 0) + math.max(0, shape_b.margin or 0)
+
 	local tolerance_sq = in_tolerance * in_tolerance
 
 	m_num_points = 0
@@ -569,6 +615,11 @@ local function shapecast_simple<T, U>(cframe_a: CFrame, direction: Vector3, shap
 
 	while true do
 		local p = support_b(shape_b, v) - ptws(local_start, support_a(shape_a, vtos(local_start, -v)))
+
+		if total_margin > 0 then
+			p += margin_unit(v) * total_margin
+		end
+
 		local w = x - p
 
 		local v_dot_w = vector.dot(v :: any, w :: any)
@@ -644,6 +695,9 @@ local function shapecast<T, U>(cframe_a: CFrame, direction: Vector3, shape_a: T 
 	local support_a = support_map[shape_a.type]
 	local support_b = support_map[shape_b.type]
 
+	local margin_a = math.max(0, shape_a.margin or 0)
+	local margin_b = math.max(0, shape_b.margin or 0)
+
 	m_num_points = 0
 
 	local lambda = 0
@@ -656,6 +710,17 @@ local function shapecast<T, U>(cframe_a: CFrame, direction: Vector3, shape_a: T 
 	while true do
 		local p = ptws(local_start, support_a(shape_a, vtos(local_start, -v)))
 		local q = support_b(shape_b, v)
+
+		--a is queried along -v, so its margin moves its support against v while b's moves with it
+		
+		--both points are offset, not just their difference, so the witness points that produce the
+		--returned contact point land on the inflated surfaces
+		if margin_a > 0 or margin_b > 0 then
+			local unit_v = margin_unit(v)
+			p -= unit_v * margin_a
+			q += unit_v * margin_b
+		end
+
 		local w = x - (q - p)
 
 		local v_dot_w = vector.dot(v :: any, w :: any)

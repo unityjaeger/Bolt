@@ -37,6 +37,43 @@ It takes the same `vertices` and `adjacency` a mesh hull carries, but no offset,
 
 Use `bolt.resize_hull(hull, size)` to rescale one.
 
+## Handling the hulls yourself
+Nothing stops you from skipping `bolt.dispatch` and walking a mesh's hulls directly. A hull is an ordinary shape, positioned by its offset scaled the same way its vertices are:
+
+```luau
+for _, hull in mesh.hulls do
+    local hull_cf = mesh_cf * CFrame.new(hull.offset * hull.scale)
+    if bolt.gjk.intersects(hull_cf, hull, other_cf, other_shape, 1e-4) then
+        --hit this hull
+    end
+end
+```
+
+To cull with the mesh's own tree instead of testing every hull, query it in mesh space:
+
+```luau
+local in_mesh = mesh_cf:ToObjectSpace(other_cf)
+
+for _, hull_id in mesh.local_tree:query_shape(in_mesh, other_shape) do
+    local hull = mesh.hulls[hull_id]
+    --...
+end
+```
+
+What you take on by doing this is the handling a margin needs. A mesh is never handed to GJK or MPR, its hulls are, so `mesh.margin` has to reach them before it means anything, and the tree's bounds have to grow with them or the tree culls hulls whose inflated surface you would still have reached. Dispatch does both, on the first query after the margin changes. Nothing else does.
+
+That leaves three things to watch for:
+
+Setting `mesh.margin` and then only ever working with the hulls yourself does nothing at all. The hulls keep whatever margin they already had, which for a fresh mesh is none.
+
+Setting `hull.margin` on each hull yourself fixes the narrow phase but not `mesh.local_tree`, which was built from unmargined hulls and will cull candidates you expected to reach. `bolt.resize_mesh(mesh, size)` rebuilds those bounds from the hulls as they are now, so passing the mesh's current size is the way to bring them back in line.
+
+Don't mix the two. Dispatch treats `mesh.margin` as the source of truth, so a single dispatched query overwrites every `hull.margin` set by hand with it, silently clearing them if `mesh.margin` is `nil`.
+
+The simple route, if you want both, is to set `mesh.margin` and let one dispatched query sync it before you start working with hulls by hand. After that the hulls and the tree will match, and `mesh.tree_margin` tells you how much of the margin those bounds already include. Bear in mind it only ever grows, as described in the margins section of the Shapes guide.
+
+For a more proper approach, base whatever code you are writing on what is already being done in dispatch.
+
 # GJK
 All already known GJK operations are possible against meshes.
 

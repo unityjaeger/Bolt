@@ -147,6 +147,7 @@ local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vect
 		type = shape_map.MESH,
 		hulls = hull_shapes,
 		local_tree = local_tree,
+		tree_margin = 0,
 		half_extents = size / 2,
 		original_half_extents = mesh_info.size / 2
 	}
@@ -190,6 +191,11 @@ local function resize_mesh(mesh: MeshShape, size: Vector3)
 		local_tree:insert(i, CFrame.new(hull.offset * scale), hull)
 	end
 	local_tree:full_rebuild()
+
+	--the hulls carry whatever margin they were last synced to, so the rebuilt bounds already
+	--account for exactly that much and nothing further needs widening
+	local hull_margin = hulls[1] and hulls[1].margin or 0
+	mesh.tree_margin = math.max(hull_margin, 0)
 end
 
 local function create_from_part(part: Part): types.Shape

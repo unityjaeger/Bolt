@@ -6,7 +6,7 @@ description: Introduction to the library.
 # Installation
 You can download Bolt through either wally or the .rbxm in the [latest release](https://github.com/unityjaeger/Bolt/releases/latest)
 ```
-bolt = "unityjaeger/bolt@0.8.0"
+bolt = "unityjaeger/bolt@0.9.0"
 ```
 
 # Features
@@ -36,5 +36,15 @@ All intersection functions count exact touching contacts as collision.
 All GJK functions and the MPR `intersects` function take an `in_tolerance` value. Pass a nonnegative world-space distance. GJK uses it as the contact distance, while MPR clamps it to a minimum effective value of `1e-6`. Typically you want this small unless you are working with very large objects. For most operations, a value between `1e-4` and `1e-3` is sensible.
 
 A GJK tolerance of `0` does not disable floating-point convergence handling.
+
+Bolt has three settings that all sound like padding and are not the same thing:
+
+| Setting | Where | What it does |
+|---|---|---|
+| `shape.margin` | any shape | Makes the shape geometrically bigger. Every query treats the inflated surface as the real one. |
+| `in_tolerance` | GJK and MPR calls | How close counts as contact. Does not change the shape. |
+| `aabb_padding` | dynamic tree config | Additional padding to the bounds in the broad phase so moving a proxy rarely touches the tree. Never changes a result. |
+
+If you want a skin around a character, or clearance between a projectile and the world, that is `margin`. If you are tuning numerical robustness, that is `in_tolerance`. If you are tuning how often `move` reinserts, that is `aabb_padding`.
 
 There are quite a few things to note with meshes, which will be talked about in the `Meshes` section.

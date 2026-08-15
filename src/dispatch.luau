@@ -6,6 +6,7 @@ local types = require("./types")
 local shape_map = require("./shape_map")
 local gjk = require("./gjk")
 local mpr = require("./mpr")
+local aabb_tree = require("./aabb_tree")
 local constants = require("./constants")
 
 local HUGE = constants.HUGE
@@ -25,6 +26,41 @@ local function fraction_scale(direction: Vector3): number
 	return if length > 0 then 1 / length else 0
 end
 
+--a mesh is never handed to gjk or mpr directly, its hulls are, 
+--so a margin written on the mesh has to reach them or it does nothing at all
+
+--the mesh's own tree has to follow as well, since bounds
+--built from unmargined hulls would cull hulls whose inflated surface the query still reaches
+
+--comparing against the first hull costs one field read on every mesh query, and the work behind it
+--only happens when the margin actually changed, which for most shapes is once
+local function mesh_hulls(mesh: types.MeshShape): {types.HullShape}
+	local hulls = mesh.hulls
+	local first = hulls[1]
+
+	if first == nil or first.margin == mesh.margin then
+		return hulls
+	end
+
+	local margin = mesh.margin
+	for _, hull in hulls do
+		hull.margin = margin
+	end
+
+	--every hull grew by the same distance, so the tree only needs its bounds widened, not rebuilt
+	
+	--only growth is applied, bounds left wide after a margin shrinks will cost a rejected candidate and
+	--nothing else, while contracting them would land a little short of where they started every time
+	--the margin moved, and bounds that end up even slightly too tight cull real contacts
+	local applied = mesh.tree_margin
+	if margin ~= nil and margin > applied then
+		aabb_tree.expand_bounds(mesh.local_tree, margin - applied)
+		mesh.tree_margin = margin
+	end
+
+	return hulls
+end
+
 local function dispatch_gjk_intersects<T, U>(
 	cframe_a: CFrame, 
 	shape_a: T & types.Shape, 
@@ -42,7 +78,7 @@ local function dispatch_gjk_intersects<T, U>(
 		end
 	elseif not is_mesh_a and is_mesh_b then
 		local in_b = tos(cframe_b, cframe_a)
-		local hulls = (shape_b :: types.MeshShape).hulls
+		local hulls = mesh_hulls(shape_b :: types.MeshShape)
 		local local_tree = (shape_b :: types.MeshShape).local_tree
 
 		return local_tree:query_shape_any(in_b, shape_a, function(hull_id: number): boolean
@@ -53,7 +89,7 @@ local function dispatch_gjk_intersects<T, U>(
 		end)
 	elseif is_mesh_a and not is_mesh_b then
 		local in_a = tos(cframe_a, cframe_b)
-		local hulls = (shape_a :: types.MeshShape).hulls
+		local hulls = mesh_hulls(shape_a :: types.MeshShape)
 		local local_tree = (shape_a :: types.MeshShape).local_tree
 
 		return local_tree:query_shape_any(in_a, shape_b, function(hull_id: number): boolean
@@ -63,8 +99,8 @@ local function dispatch_gjk_intersects<T, U>(
 			return hit
 		end)
 	else
-		local hulls_a = (shape_a :: types.MeshShape).hulls
-		local hulls_b = (shape_b :: types.MeshShape).hulls
+		local hulls_a = mesh_hulls(shape_a :: types.MeshShape)
+		local hulls_b = mesh_hulls(shape_b :: types.MeshShape)
 		local local_tree_b = (shape_b :: types.MeshShape).local_tree
 
 		for _, hull_a in hulls_a do
@@ -103,7 +139,7 @@ local function dispatch_gjk_raycast<T, U>(
 	if not is_mesh then
 		return gjk.raycast(ray_origin, ray_direction, cframe, shape, in_tolerance)
 	else
-		local hulls = (shape :: types.MeshShape).hulls
+		local hulls = mesh_hulls(shape :: types.MeshShape)
 		local local_tree = (shape :: types.MeshShape).local_tree
 		local local_origin = ptos(cframe, ray_origin)
 		local local_direction = vtos(cframe, ray_direction)
@@ -149,7 +185,7 @@ local function dispatch_gjk_shapecast_simple<T, U>(
 	if not is_mesh_a and not is_mesh_b then
 		return gjk.shapecast_simple(cframe_a, direction, shape_a, cframe_b, shape_b, in_tolerance)
 	elseif not is_mesh_a and is_mesh_b then
-		local hulls = (shape_b :: types.MeshShape).hulls
+		local hulls = mesh_hulls(shape_b :: types.MeshShape)
 		local local_tree = (shape_b :: types.MeshShape).local_tree
 		local local_origin = tos(cframe_b, cframe_a)
 		local local_direction = vtos(cframe_b, direction)
@@ -171,7 +207,7 @@ local function dispatch_gjk_shapecast_simple<T, U>(
 			return distance * inv_length
 		end)
 	elseif is_mesh_a and not is_mesh_b then
-		local hulls = (shape_a :: types.MeshShape).hulls
+		local hulls = mesh_hulls(shape_a :: types.MeshShape)
 		local local_tree = (shape_a :: types.MeshShape).local_tree
 		local local_origin = tos(cframe_a, cframe_b)
 		local local_direction = vtos(cframe_a, direction)
@@ -193,8 +229,8 @@ local function dispatch_gjk_shapecast_simple<T, U>(
 			return distance * inv_length
 		end)
 	else
-		local hulls_a = (shape_a :: types.MeshShape).hulls
-		local hulls_b = (shape_b :: types.MeshShape).hulls
+		local hulls_a = mesh_hulls(shape_a :: types.MeshShape)
+		local hulls_b = mesh_hulls(shape_b :: types.MeshShape)
 		local local_tree_b = (shape_b :: types.MeshShape).local_tree
 		local inv_length = fraction_scale(direction)
 
@@ -245,7 +281,7 @@ local function dispatch_gjk_shapecast<T, U>(
 	if not is_mesh_a and not is_mesh_b then
 		return gjk.shapecast(cframe_a, direction, shape_a, cframe_b, shape_b, in_tolerance)
 	elseif not is_mesh_a and is_mesh_b then
-		local hulls = (shape_b :: types.MeshShape).hulls
+		local hulls = mesh_hulls(shape_b :: types.MeshShape)
 		local local_tree = (shape_b :: types.MeshShape).local_tree
 		local local_origin = tos(cframe_b, cframe_a)
 		local local_direction = vtos(cframe_b, direction)
@@ -269,7 +305,7 @@ local function dispatch_gjk_shapecast<T, U>(
 			return distance * inv_length
 		end)
 	elseif is_mesh_a and not is_mesh_b then
-		local hulls = (shape_a :: types.MeshShape).hulls
+		local hulls = mesh_hulls(shape_a :: types.MeshShape)
 		local local_tree = (shape_a :: types.MeshShape).local_tree
 		local local_origin = tos(cframe_a, cframe_b)
 		local local_direction = vtos(cframe_a, direction)
@@ -293,8 +329,8 @@ local function dispatch_gjk_shapecast<T, U>(
 			return distance * inv_length
 		end)
 	else
-		local hulls_a = (shape_a :: types.MeshShape).hulls
-		local hulls_b = (shape_b :: types.MeshShape).hulls
+		local hulls_a = mesh_hulls(shape_a :: types.MeshShape)
+		local hulls_b = mesh_hulls(shape_b :: types.MeshShape)
 		local local_tree_b = (shape_b :: types.MeshShape).local_tree
 		local inv_length = fraction_scale(direction)
 
@@ -344,7 +380,7 @@ local function dispatch_mpr_mesh_primitive<T, U>(
 
 	if not is_mesh_a and is_mesh_b then
 		local in_b = tos(cframe_b, cframe_a)
-		local hulls = (shape_b :: types.MeshShape).hulls
+		local hulls = mesh_hulls(shape_b :: types.MeshShape)
 		for _, hull_id in (shape_b :: types.MeshShape).local_tree:query_shape(in_b, shape_a) do
 			local hull = hulls[hull_id]
 			local hull_cf = cframe_b * CFrame.new(hull.offset * hull.scale)
@@ -355,7 +391,7 @@ local function dispatch_mpr_mesh_primitive<T, U>(
 		end
 	elseif is_mesh_a and not is_mesh_b then
 		local in_a = tos(cframe_a, cframe_b)
-		local hulls = (shape_a :: types.MeshShape).hulls
+		local hulls = mesh_hulls(shape_a :: types.MeshShape)
 		for _, hull_id in (shape_a :: types.MeshShape).local_tree:query_shape(in_a, shape_b) do
 			local hull = hulls[hull_id]
 			local hull_cf = cframe_a * CFrame.new(hull.offset * hull.scale)
@@ -377,8 +413,8 @@ local function dispatch_mpr_mesh_mesh<T, U>(cframe_a: CFrame,
 ): {{normal: Vector3, depth: number, point_a: Vector3, point_b: Vector3, hull_a_id: number, hull_b_id: number}}
 	local out = {}
 
-	local hulls_a = (shape_a :: types.MeshShape).hulls
-	local hulls_b = (shape_b :: types.MeshShape).hulls
+	local hulls_a = mesh_hulls(shape_a :: types.MeshShape)
+	local hulls_b = mesh_hulls(shape_b :: types.MeshShape)
 	local local_tree_b = (shape_b :: types.MeshShape).local_tree
 	for hull_a_id, hull_a in hulls_a do
 		local hull_a_cf = cframe_a * CFrame.new(hull_a.offset * hull_a.scale)

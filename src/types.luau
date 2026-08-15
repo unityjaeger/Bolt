@@ -1,5 +1,10 @@
 export type Shape = {
-	type: number
+	type: number,
+	--inflates the shape by this distance in every direction, as if it were swept by a sphere of
+	--this radius, every query treats the inflated surface as the real one
+	
+	--must be nonnegative, a negative value is ignored rather than shrinking the shape
+	margin: number?
 }
 
 export type BoxShape = Shape & {
@@ -51,7 +56,15 @@ export type MeshShape = Shape & {
 	half_extents: Vector3,
 	original_half_extents: Vector3,
 	hulls: {HullShape},
-	local_tree: StaticTree
+	local_tree: StaticTree,
+	--how much of the mesh's margin the local tree's bounds already account for,
+	--so a margin change widens them by the difference instead of rebuilding
+	
+	--it only rises, since bounds that stay wide after a margin drops will
+	--cost a rejected candidate while tightened ones would cull real contacts
+
+	--resize_mesh rebuilds the bounds and resets it
+	tree_margin: number
 }
 
 export type HullShape = Shape & Hull & {

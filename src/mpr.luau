@@ -77,12 +77,29 @@ local function tri_dist(P: Vector3, x0: Vector3, B: Vector3, C: Vector3): (numbe
 	end
 end
 
+--inflating a convex shape by its margin moves every support point that far along the query
+--direction, exactly a minkowski sum with a sphere of that radius
+
+--dir is a unit vector at every support site below, so no normalization is needed
+
+--the two points are offset individually because they also become the witness points behind the reported contact
+local function apply_margins(a: Vector3, b: Vector3, dir: Vector3, margin_a: number, margin_b: number): (Vector3, Vector3)
+	return a + dir * margin_a, b - dir * margin_b
+end
+
 local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cframe_b: CFrame, shape_b: U & types.Shape, in_tolerance: number): (boolean, Vector3, number?, Vector3?, Vector3?)
 	in_tolerance = math.max(in_tolerance, MAX_TOLERANCE)
 	local transform_b_in_a = tos(cframe_a, cframe_b)
 
 	local support_a = support_map[shape_a.type] :: any
 	local support_b = support_map[shape_b.type]
+
+	--the two are offset separately below, so a negative margin has to be dropped here rather than anywhere later
+	
+	--left alone it would deflate its own shape while the other one still inflates
+	local margin_a = math.max(0, shape_a.margin or 0)
+	local margin_b = math.max(0, shape_b.margin or 0)
+	local has_margin = margin_a > 0 or margin_b > 0
 
 	local center_b_in_a = transform_b_in_a.Position
 	local v01 = V3_ZERO
@@ -97,6 +114,9 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 
 	local v11 = support_a(shape_a, dir)
 	local v12 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -dir :: any)))
+	if has_margin then
+		v11, v12 = apply_margins(v11, v12, dir :: any, margin_a, margin_b)
+	end
 	local v1 = v11 - v12
 
 	local dot = vector.dot(v1, dir)
@@ -122,6 +142,9 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 	dir = vector.normalize(dir)
 	local v21 = support_a(shape_a, dir)
 	local v22 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -dir :: any)))
+	if has_margin then
+		v21, v22 = apply_margins(v21, v22, dir :: any, margin_a, margin_b)
+	end
 	local v2 = v21 - v22
 
 	dot = vector.dot(v2, dir)
@@ -145,6 +168,9 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 	while true do
 		v31 = support_a(shape_a, dir)
 		v32 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -dir :: any)))
+		if has_margin then
+			v31, v32 = apply_margins(v31, v32, dir :: any, margin_a, margin_b)
+		end
 		v3 = v31 - v32
 		local dot_v3 = vector.dot(v3, dir)
 		if dot_v3 < -in_tolerance then
@@ -196,6 +222,9 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 
 		local v41 = support_a(shape_a, dir)
 		local v42 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -dir :: any)))
+		if has_margin then
+			v41, v42 = apply_margins(v41, v42, dir :: any, margin_a, margin_b)
+		end
 		local v4 = v41 - v42
 		dot = vector.dot(v4, dir)
 		if dot < -in_tolerance then
@@ -248,6 +277,7 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 	end
 
 	--libccd treats a portal face at the origin as a touching contact
+
 	--if the face is only outside/inside by the configured numerical tolerance, use the current face directly instead of trying to refine past precision
 	local iterations = portal_within_tolerance and MAX_ITER or 0
 	while true do
@@ -257,6 +287,9 @@ local function intersects<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cfra
 
 		local v41 = support_a(shape_a, dir)
 		local v42 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, -dir :: any)))
+		if has_margin then
+			v41, v42 = apply_margins(v41, v42, dir :: any, margin_a, margin_b)
+		end
 		local v4 = v41 - v42
 
 		local dv1 = vector.dot(v1, dir)
@@ -356,7 +389,13 @@ local function is_separated<T, U>(cframe_a: CFrame, shape_a: T & types.Shape, cf
 	local v12 = ptws(transform_b_in_a, support_b(shape_b, vtos(transform_b_in_a, normal_in_a)))
 	local v_test = v12 - v11
 
-	local gap = vector.dot(v_test :: any, normal_in_a :: any)
+
+	--a is queried along -normal_in_a and b along +normal_in_a, so both margins close the gap by
+	--their own amount, scaled by the length of the normal used to measure it
+	local total_margin = math.max(0, shape_a.margin or 0) + math.max(0, shape_b.margin or 0)
+
+	local gap = vector.dot(v_test :: any, normal_in_a :: any) + total_margin * vector.magnitude(normal_in_a :: any)
+
 	return gap < 0
 end
 

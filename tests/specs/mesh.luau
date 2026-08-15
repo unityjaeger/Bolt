@@ -36,6 +36,58 @@ return function(t: any, bolt: any)
 		t.set_equal(mesh.local_tree:query_shape(CFrame.new(-2, 0, 0), probe), {})
 	end)
 
+	--the margins guide tells anyone handling hulls by hand that one dispatched query brings the hulls
+	--and the local tree in line, and that they agree from then on, these check that promise
+	t.test("mesh/a synced margin reaches hulls handled by the user", function()
+		local mesh = helpers.make_two_hull_mesh(bolt)
+		local probe = bolt.create_sphere(0.1)
+
+		mesh.margin = 0.5
+		--the margin only reaches the hulls through dispatch, so one query has to happen first
+		bolt.dispatch.gjk.intersects(CFrame.identity, mesh, CFrame.new(80, 0, 0), probe, 1e-5)
+
+		local function by_hand(at: CFrame): boolean
+			for _, hull in mesh.hulls do
+				local hull_cf = CFrame.new(hull.offset * hull.scale)
+				if bolt.gjk.intersects(hull_cf, hull, at, probe, 1e-5) then
+					return true
+				end
+			end
+			return false
+		end
+
+		--the hull's top face is at 0.5, so with the probe and the margin contact holds out to 1.1
+		t.truthy(by_hand(CFrame.new(2, 1.05, 0)))
+		t.falsy(by_hand(CFrame.new(2, 1.15, 0)))
+	end)
+
+	t.test("mesh/a user handled local tree query matches dispatch", function()
+		local mesh = helpers.make_two_hull_mesh(bolt)
+		local probe = bolt.create_sphere(0.3)
+		local mesh_cf = CFrame.new(1, 2, -3) * CFrame.Angles(0.4, 0.9, -0.2)
+
+		mesh.margin = 0.5
+		bolt.dispatch.gjk.intersects(mesh_cf, mesh, CFrame.new(80, 0, 0), probe, 1e-4)
+
+		local random = Random.new(606)
+		for _ = 1, 250 do
+			local other_cf = mesh_cf * CFrame.new(random:NextNumber(-5, 5), random:NextNumber(-2, 2), random:NextNumber(-2, 2))
+
+			--the same culling loop the meshes guide shows
+			local in_mesh = mesh_cf:ToObjectSpace(other_cf)
+			local by_hand = false
+			for _, hull_id in mesh.local_tree:query_shape(in_mesh, probe) do
+				local hull = mesh.hulls[hull_id]
+				local hull_cf = mesh_cf * CFrame.new(hull.offset * hull.scale)
+				if bolt.gjk.intersects(hull_cf, hull, other_cf, probe, 1e-4) then
+					by_hand = true
+				end
+			end
+
+			t.equal(by_hand, bolt.dispatch.gjk.intersects(mesh_cf, mesh, other_cf, probe, 1e-4))
+		end
+	end)
+
 	t.test("mesh/dispatch GJK intersects scaled hull in both argument orders", function()
 		local mesh = helpers.make_two_hull_mesh(bolt, Vector3.new(12, 2, 4))
 		local sphere = bolt.create_sphere(0.25)
