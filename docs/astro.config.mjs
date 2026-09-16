@@ -24,7 +24,8 @@ export default defineConfig({
 						{ label: "MPR", slug: "guides/mpr" },
 						{ label: "AABB Tree", slug: "guides/aabb_tree" },
 						{ label: "Meshes", slug: "guides/meshes" },
-						{ label: "Debug Addon", slug: "guides/addons" }
+						{ label: "Debug Addon", slug: "guides/addons" },
+						{ label: "Temporal Tree Addon", slug: "guides/temporal_tree" }
 					],
 				},
 			],

@@ -50,6 +50,23 @@ Updates the actual shape information, use this when the shape information change
 
 That includes `shape.margin`, which is easy to overlook because it is a single field rather than a resize call. A tree only reads a shape's size when the shape is inserted or resized, so a margin raised afterwards leaves the bounds too small and the tree can stop offering the shape as a candidate.
 
+### Bounds without a shape
+```luau
+tree:insert_bounds(id: number, min: Vector3, max: Vector3)
+```
+Registers a proxy from an AABB you supply rather than from a shape at a transform. Use it for things like: a volume swept over a step, the extent something covered across a window of time, or an area owned by code outside the library. The bounds are expanded by `aabb_padding` exactly as an inserted shape's are, and the proxy is returned by every query like any other.
+
+```luau
+tree:set_bounds(id: number, min: Vector3, max: Vector3)
+```
+The update path for those proxies, and the counterpart to `move`. Like `move`, it leaves the tree untouched while the new bounds still fit inside the padded ones, so calling it every frame is fine.
+
+:::note
+`move` and `resize` do nothing to a proxy inserted this way. Both exist to recompute bounds from a shape at a transform, and this kind of proxy has neither, so there is nothing for them to recompute. `set_bounds` is the only thing that moves it.
+
+They are only ignored for these proxies. Shapes inserted with `insert` keep behaving exactly as before.
+:::
+
 ### Querying
 The `query_aabb`, `query_shape`, `query_ray` and `query_shapecast` functions return an array of `id`'s whose AABB overlap the query volume. These are only candidates. You still need to run a narrow phase check against each candidate to make sure they really are intersecting. The `_closest` and `_any` variants documented below resolve the answer during the traversal instead, and hand you a result rather than a list.
 

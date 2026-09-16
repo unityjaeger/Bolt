@@ -7,19 +7,23 @@ MPR and GJK only work with convex shapes, so arbitrary meshes need to be decompo
 
 Meshes are supported through this [Plugin](https://create.roblox.com/store/asset/114210433179837/Collision-Hulls)
 
-This plugin will allow you to select a MeshPart or UnionOperation and export its convex decomposition exactly as roblox computes it.
+The plugin lets you select a `MeshPart` or union and export the convex hulls the engine itself collides it with, at the part's own `CollisionFidelity`. The hulls are read out of the engine's serialized collision data, so they match what the physics engine simulates against.
 
-After being exported, the exported mesh information will appear under `ReplicatedStorage.Collisions`. It also automatically generates the module that is necessary to decompress the information as it is stored in base64.
+Before exporting, the plugin can draw the hulls over the selected part. They follow the part through `CFrame` and `Size` changes.
+
+An export appears under `ReplicatedStorage.Collisions.Hulls` as a folder named after the part, holding the hull data as zstd compressed, chunked `StringValue`s. The `CollisionParser` module that reads it back is placed next to it.
 
 Heres an example of a mesh shape being created this way:
 ```luau
 local parser = require(game.ReplicatedStorage.Collisions.CollisionParser)
 
-local hull_data = parser.Decode("ExampleMesh")
+local hull_data = parser.decode("ExampleMesh")
 
-local mesh_shape = bolt.create_mesh(hull_data, Vector3.new(5, 5, 5))
+local mesh_shape = bolt.create_mesh(hull_data, mesh_part.Size)
 ```
-The second argument is the mesh size. It applies component-wise, non-uniform scale to every hull's vertices and offset. The mesh `CFrame` then transforms those scaled hulls into world space. Calling `resize_mesh` updates the hull scales and rebuilds the mesh's local AABB tree with the new offsets.
+The second argument is the mesh size. The hulls are expressed at the size the part had when it was exported, and `create_mesh` applies component-wise, non-uniform scale to every hull's vertices and offset from there, so passing the part's current size puts them where the engine has them. The mesh `CFrame` then transforms those scaled hulls into world space. Calling `resize_mesh` updates the hull scales and rebuilds the mesh's local AABB tree with the new offsets.
+
+Every decoded hull also carries `triangles`, three 1-based vertex indices per face, flat. `create_mesh` does not need them, but they are what a contact manifold would be clipped against, so they are kept for whoever may need them.
 
 Meshes have to be interacted with differently as they are not a single shape that can be easily worked with under the hood, but rather a set of convex hulls.
 
@@ -41,10 +45,9 @@ Use `bolt.resize_hull(hull, size)` to rescale one.
 Nothing stops you from skipping `bolt.dispatch` and walking a mesh's hulls directly. A hull is an ordinary shape, positioned by its offset scaled the same way its vertices are:
 
 ```luau
-for _, hull in mesh.hulls do
-    local hull_cf = mesh_cf * CFrame.new(hull.offset * hull.scale)
-    if bolt.gjk.intersects(hull_cf, hull, other_cf, other_shape, 1e-4) then
-        --hit this hull
+for _, child in composite.children do
+    if bolt.gjk.intersects(composite_cf * child.cf, child.shape, other_cf, other_shape, 1e-4) then
+        --hit this child
     end
 end
 ```
@@ -52,10 +55,10 @@ end
 To cull with the mesh's own tree instead of testing every hull, query it in mesh space:
 
 ```luau
-local in_mesh = mesh_cf:ToObjectSpace(other_cf)
+local in_composite = composite_cf:ToObjectSpace(other_cf)
 
-for _, hull_id in mesh.local_tree:query_shape(in_mesh, other_shape) do
-    local hull = mesh.hulls[hull_id]
+for _, child_id in composite.local_tree:query_shape(in_composite, other_shape) do
+    local child = composite.children[child_id]
     --...
 end
 ```
@@ -146,11 +149,11 @@ bolt.dispatch.mpr.mesh_primitive(
     depth: number,
     point_a: Vector3,
     point_b: Vector3,
-    hull_a_id: number?,
-    hull_b_id: number?
+    child_a_id: number?,
+    child_b_id: number?
 }}
 ```
-Compared to GJK, MPR returns all intersected hulls for further processing. IDs follow argument order: if `shape_a` is the mesh, `hull_a_id` identifies its hull, if `shape_b` is the mesh, `hull_b_id` identifies its hull. The ID for a primitive argument is `nil`.
+Compared to GJK, MPR returns all intersected children for further processing. IDs follow argument order: if `shape_a` is the composite, `child_a_id` identifies its child, if `shape_b` is the composite, `child_b_id` identifies its child. The ID for a primitive argument is `nil`.
 
 Normals and contact points also retain function argument order when the mesh is shape A: the normal points from shape B toward shape A, `point_a` belongs to the mesh hull, and `point_b` belongs to the primitive.
 
@@ -166,13 +169,13 @@ bolt.dispatch.mpr.mesh_mesh(
     depth: number,
     point_a: Vector3,
     point_b: Vector3,
-    hull_a_id: number,
-    hull_b_id: number
+    child_a_id: number,
+    child_b_id: number
 }}
 ```
-Since both are meshes, both `hull_a_id` and `hull_b_id` will never be `nil`.
+Since both are meshes, both `child_a_id` and `child_b_id` will never be `nil`.
 
 # Important Notes
-It is currently not possible to calculate a contact manifold for clipping, etc. because the exported mesh information only includes vertices and adjacency for vertices.
+Bolt does not currently calculate a contact manifold for clipping, etc. against meshes. The exported hulls carry their triangles, so the face information a manifold needs is there, but nothing in the library does anything with it yet.
 
 It is much harder to get a reliable depenetration vector when working with meshes composed of convex hulls, requiring an iterative approach.

@@ -1,22 +1,23 @@
 --!strict
 
+local check = require('./check')
+
 local EPSILON = 1e-4
 local DELTA = 1e-3
 
-local function assert_miss(t: any, point: Vector3?, distance: number?, normal: Vector3?, message: string?)
-	t.is_nil(point, message)
-	t.is_nil(distance, message)
-	t.is_nil(normal, message)
+local function assert_miss(point: Vector3?, distance: number?, normal: Vector3?, message: string?)
+	check.is_nil(point, message)
+	check.is_nil(distance, message)
+	check.is_nil(normal, message)
 end
 
-local function assert_start_hit(t: any, point: Vector3?, distance: number?, normal: Vector3?, origin: Vector3)
-	t.vector_near(t.non_nil(point), origin)
-	t.near(t.non_nil(distance), 0)
-	t.vector_near(t.non_nil(normal), Vector3.zero)
+local function assert_start_hit(point: Vector3?, distance: number?, normal: Vector3?, origin: Vector3)
+	check.vector_near(check.non_nil(point), origin)
+	check.near(check.non_nil(distance), 0)
+	check.vector_near(check.non_nil(normal), Vector3.zero)
 end
 
 local function assert_cast_hit(
-	t: any,
 	point: Vector3?,
 	distance: number?,
 	normal: Vector3?,
@@ -24,29 +25,29 @@ local function assert_cast_hit(
 	direction: Vector3,
 	expected_distance: number?
 )
-	local hit_point = t.non_nil(point)
-	local hit_distance = t.non_nil(distance)
-	local hit_normal = t.non_nil(normal)
+	local hit_point = check.non_nil(point)
+	local hit_distance = check.non_nil(distance)
+	local hit_normal = check.non_nil(normal)
 
-	t.vector_finite(hit_point)
-	t.finite(hit_distance)
-	t.vector_finite(hit_normal)
-	t.truthy(hit_distance >= -EPSILON)
-	t.truthy(hit_distance <= direction.Magnitude + EPSILON)
+	check.vector_finite(hit_point)
+	check.finite(hit_distance)
+	check.vector_finite(hit_normal)
+	check.truthy(hit_distance >= -EPSILON)
+	check.truthy(hit_distance <= direction.Magnitude + EPSILON)
 
 	if expected_distance ~= nil then
-		t.near(hit_distance, expected_distance, EPSILON)
+		check.near(hit_distance, expected_distance, EPSILON)
 	end
 
 	if direction.Magnitude > 0 then
 		local expected_point = origin + direction * (hit_distance / direction.Magnitude)
-		t.vector_near(hit_point, expected_point, EPSILON)
+		check.vector_near(hit_point, expected_point, EPSILON)
 	end
 end
 
-local function assert_unit_vector(t: any, value: Vector3, epsilon: number?)
-	t.vector_finite(value)
-	t.near(value.Magnitude, 1, epsilon or EPSILON)
+local function assert_unit_vector(value: Vector3, epsilon: number?)
+	check.vector_finite(value)
+	check.near(value.Magnitude, 1, epsilon or EPSILON)
 end
 
 local function random_cframe(random: Random, position_range: number): CFrame

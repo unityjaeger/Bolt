@@ -52,19 +52,33 @@ export type Hull = {
 	adjacency: {{number}}
 }
 
-export type MeshShape = Shape & {
-	half_extents: Vector3,
-	original_half_extents: Vector3,
-	hulls: {HullShape},
-	local_tree: StaticTree,
-	--how much of the mesh's margin the local tree's bounds already account for,
-	--so a margin change widens them by the difference instead of rebuilding
-	
-	--it only rises, since bounds that stay wide after a margin drops will
-	--cost a rejected candidate while tightened ones would cull real contacts
+--a shape built out of other shapes, meshes are one of these, with a hull per child, and so is anything assembled out of parts
 
-	--resize_mesh rebuilds the bounds and resets it
+--composites do not nest, a child is always a leaf shape
+export type Child = {
+	cf: CFrame,
+	shape: Shape
+}
+
+export type Composite = Shape & {
+	children: {Child},
+	local_tree: Tree,
+	--how much margin the local tree's bounds currently include, so the composite's own bounds can be
+	--recovered from its tree root without walking the children
 	tree_margin: number
+}
+
+--children never move, so its tree is built once and its bounds never go stale
+export type StaticComposite = Composite & {
+	local_tree: StaticTree
+}
+
+--children move, so its tree has to keep up with them
+
+--set_child is the only way to move one, which is also what tells the composite its bounds are stale
+export type DynamicComposite = Composite & {
+	local_tree: DynamicTree,
+	dirty: boolean
 }
 
 export type HullShape = Shape & Hull & {
@@ -119,6 +133,10 @@ export type Tree = {
 export type DynamicTree = Tree & {
 	padding: vector,
 	insert: (dyn_tree: DynamicTree, id: number, cf: CFrame, shape: Shape) -> (),
+	--the proxy's bounds are provided instead of computed from a shape
+	--updated via set_bounds instead of move and resize
+	insert_bounds: (dyn_tree: DynamicTree, id: number, min: Vector3, max: Vector3) -> (),
+	set_bounds: (dyn_tree: DynamicTree, id: number, min: Vector3, max: Vector3) -> (),
 	remove: (dyn_tree: DynamicTree, id: number) -> (),
 	move: (dyn_tree: DynamicTree, id: number, cf: CFrame) -> (),
 	resize: (dyn_tree: DynamicTree, id: number, shape: Shape) -> (),

@@ -35,7 +35,7 @@ bolt.create_wedge(size: Vector3): WedgeShape
 bolt.create_corner_wedge(size: Vector3): CornerWedgeShape
 ```
 ```luau
-bolt.create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vector3): MeshShape
+bolt.create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vector3): StaticComposite
 ```
 
 ```luau
@@ -50,7 +50,7 @@ The second argument scales it the same way mesh size does, component wise agains
 Mesh size applies component wise, non-uniform scaling to hull vertices and hull offsets.
 
 ```luau
-bolt.resize_mesh(mesh: MeshShape, size: Vector3)
+bolt.resize_mesh(mesh: StaticComposite, size: Vector3)
 ```
 A resize method is specifically only needed for meshes and hulls as there is more work needed than a single value change. `resize_mesh` updates every hull's scale and rebuilds the mesh's local AABB tree with the scaled hull offsets.
 
@@ -66,6 +66,65 @@ Resizing does not update any AABB tree the shape is registered in. Call `tree:re
 :::note
 Capsules and cylinders both use the same alignment as cylinders in roblox, so cframe.RightVector is the axis, while size.X is the height and size.Y/2 is the radius.
 :::
+
+## Composites
+A composite is a shape built out of other shapes, each sitting at its own transform inside it. A mesh is one, with a convex hull per child. So is anything assembled out of parts, a model or a character rig.
+
+Composites do not nest. A child is always a leaf shape, so recursion can be avoided.
+
+```luau
+bolt.create_static_composite(children: {Child}): StaticComposite
+```
+```luau
+bolt.create_dynamic_composite(children: {Child}, config: DynamicTreeConfig?): DynamicComposite
+```
+
+A `Child` is `{cf: CFrame, shape: Shape}`, the transform being relative to the composite's own origin.
+
+```luau
+local rig = bolt.create_dynamic_composite({
+    {cf = CFrame.new(0, 2, 0), shape = bolt.create_box(Vector3.new(2, 1, 1))},
+    {cf = CFrame.new(0, 0, 0), shape = bolt.create_box(Vector3.new(2, 2, 1))},
+})
+```
+
+The two differ in whether the children ever move, which is the only thing that matters to everything downstream.
+
+A **static** composite is built once. Its local tree uses the same binned SAH the static tree does, which is the better tree. This is what `create_mesh` gives you.
+
+A **dynamic** composite expects its children to move. Its local tree is dynamic, so a child can be moved without a rebuild, and `set_child` is the only thing that will move one:
+
+```luau
+bolt.set_child(composite: DynamicComposite, index: number, cf: CFrame)
+```
+
+That call moves the child, keeps the local tree in sync, and marks the composite so anything cached off its overall size knows that it has to look again. Writing `children[i].cf` yourself does none of that.
+
+Composites are queried through `bolt.dispatch`, exactly as meshes were.
+
+:::note
+A composite has no declared size. Its bounds come from its own local tree, so they follow the children rather than a number you supplied, which is both tighter and one less thing to keep in sync.
+:::
+
+## Bounds
+```luau
+bolt.shape_aabb(cf: CFrame, shape: Shape): (Vector3, Vector3)
+```
+The axis aligned bounds of a shape placed at a `CFrame`, as `(min, max)`. This is the same computation an AABB tree runs when you insert a proxy, margin included.
+
+You do not need this for ordinary queries, the tree already does it for you. It is here for bounds you assemble yourself, which is what `tree:insert_bounds` takes.
+
+## Circumradius
+```luau
+bolt.circumradius(shape: Shape): number
+```
+The radius of the smallest sphere centred on the shape's origin that still contains it, whatever direction the shape is facing.
+
+An AABB grows and shrinks as a shape turns, so a bound built from one only describes the orientation it was measured at. A circumradius does not change with rotation, which is what you want when a bound has to hold across orientations rather than at one of them: a volume swept while something spins, or the extent an object covered over a window of time.
+
+It follows the shape, so a margin adds to it and a resize changes it. Negative margins are ignored here exactly as they are everywhere else.
+
+This is exact for spheres, boxes, ellipsoids, capsules, cylinders, hulls and composites. Wedges take the diagonal of the box their half extents describe, which is never too small. Hulls measure their vertices rather than their declared size. A composite is measured from the root of its own local tree, so it follows its children exactly as its bounds do.
 
 ## Margins
 Every shape has an optional `margin`, which inflates it by that distance in all directions, as if it were swept by a sphere of that radius.

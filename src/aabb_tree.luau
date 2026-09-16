@@ -118,7 +118,7 @@ local function swept_aabb(cast_min: vector, cast_max: vector, ray_inv_dir: Vecto
 end
 
 local function unmargined_shape_aabb(cf: CFrame, shape: types.Shape): (vector, vector)
-	if shape.type == shape_map.BOX or shape.type == shape_map.MESH then
+	if shape.type == shape_map.BOX then
 		local half_extents = (shape :: types.BoxShape).half_extents
 		local center = cf.Position
 		local right, up, look = cf.RightVector, cf.UpVector, cf.LookVector
@@ -212,6 +212,34 @@ local function unmargined_shape_aabb(cf: CFrame, shape: types.Shape): (vector, v
 		local maxv = vector.max(v1 :: any, v2 :: any, v3 :: any, v4 :: any, v5 :: any)
 
 		return origin + minv :: any, origin + maxv :: any
+	elseif shape.type == shape_map.COMPOSITE then
+		--a composite is as big as its own tree says it is, so its root node stands in for the half extents
+
+		--the root already includes whatever margin reached the children, and the caller adds the
+		--composite's margin on top, so it is taken back out here rather than counted twice
+		local composite = shape :: types.Composite
+		local tree = composite.local_tree
+		local root = tree.root
+
+		if root == NULL then
+			return cf.Position :: any, cf.Position :: any
+		end
+
+		local applied = vector.one * composite.tree_margin
+		local local_min = tree.aabb_min[root] + applied
+		local local_max = tree.aabb_max[root] - applied
+
+		--the local bounds are a box sitting somewhere inside the composite, so it gets the same
+		--treatment a box does, about its own centre rather than the composite's origin
+		local half = (local_max - local_min) * 0.5
+		local center = cf * ((local_min + local_max) * 0.5) :: any
+		local right, up, look = cf.RightVector, cf.UpVector, cf.LookVector
+
+		local e = vector.abs(right :: any) * half.x +
+			vector.abs(up :: any) * half.y +
+			vector.abs(look :: any) * half.z
+
+		return center - e :: any, center + e :: any
 	elseif shape.type == shape_map.HULL then
 		local hull = (shape :: types.HullShape)
 		local scale = hull.scale
@@ -707,6 +735,54 @@ local function public_insert(dyn_tree: DynamicTree, id: number, cf: CFrame, shap
 	insert_leaf(dyn_tree, index)
 end
 
+--a proxy whose bounds are computed rather than derived from a shape at a transform, for tracking regions the library has no shape for:
+--a swept volume, a window of past positions, an area owned by something outside bolt entirely
+
+--the cf and shape slots are left holding the placeholder alloc uses, which is what marks the leaf as bounds only
+
+--a reused index still carries the previous leaf's payload, so they are written here rather than relied on
+local function public_insert_bounds(dyn_tree: DynamicTree, id: number, min: Vector3, max: Vector3)
+	local leaf_map = dyn_tree.leaf_map
+	if leaf_map[id] then
+		error("id already registered")
+	end
+
+	local index = alloc(dyn_tree)
+	local padding = dyn_tree.padding
+
+	dyn_tree.aabb_min[index] = min - padding :: any
+	dyn_tree.aabb_max[index] = max + padding :: any
+	dyn_tree.height[index] = 0
+	dyn_tree.id[index] = id
+	dyn_tree.cf[index] = false :: any
+	dyn_tree.shape[index] = false :: any
+
+	dyn_tree.proxy_count += 1
+	leaf_map[id] = index
+
+	insert_leaf(dyn_tree, index)
+end
+
+--the update path for those proxies, and the counterpart to move
+
+--it keeps move's trick of leaving the tree alone while the new bounds still sit inside the padded ones
+local function public_set_bounds(dyn_tree: DynamicTree, id: number, min: Vector3, max: Vector3)
+	local index = dyn_tree.leaf_map[id]
+
+	if aabb_contains(dyn_tree.aabb_min[index], dyn_tree.aabb_max[index], min :: any, max :: any) then
+		return
+	end
+
+	local padding = dyn_tree.padding
+
+	remove_leaf(dyn_tree, index)
+
+	dyn_tree.aabb_min[index] = min - padding :: any
+	dyn_tree.aabb_max[index] = max + padding :: any
+
+	insert_leaf(dyn_tree, index)
+end
+
 local function public_remove(dyn_tree: DynamicTree, id: number)
 	local index = dyn_tree.leaf_map[id]
 	if not index then
@@ -726,7 +802,16 @@ end
 
 local function public_move(dyn_tree: DynamicTree, id: number, cf: CFrame)
 	local index = dyn_tree.leaf_map[id]
-	local min, max = shape_aabb(cf, dyn_tree.shape[index])
+	local shape = dyn_tree.shape[index]
+
+	--a leaf inserted as raw bounds has no shape to place at this transform, and its bounds come from set_bounds instead
+	
+	--the placeholder alloc leaves in the shape slot is what marks it, so nothing extra is stored to tell the two kinds of leaf apart
+	if not shape then
+		return
+	end
+
+	local min, max = shape_aabb(cf, shape)
 
 	if aabb_contains(dyn_tree.aabb_min[index], dyn_tree.aabb_max[index], min, max) then
 		dyn_tree.cf[index] = cf
@@ -746,7 +831,14 @@ end
 
 local function public_resize(dyn_tree: DynamicTree, id: number, shape: types.Shape)
 	local index = dyn_tree.leaf_map[id]
-	local min, max = shape_aabb(dyn_tree.cf[index], shape)
+	local cf = dyn_tree.cf[index]
+
+	--as with move, raw bounds have no transform to rebuild the shape's bounds at
+	if not cf then
+		return
+	end
+
+	local min, max = shape_aabb(cf, shape)
 
 	local padding = dyn_tree.padding
 
@@ -1507,6 +1599,8 @@ local function new_dynamic_tree(config: Config): DynamicTree
 		leaf_map = {},
 		proxy_count = 0,
 		insert = public_insert,
+		insert_bounds = public_insert_bounds,
+		set_bounds = public_set_bounds,
 		remove = public_remove,
 		move = public_move,
 		resize = public_resize,
@@ -1651,5 +1745,6 @@ end
 return {
 	new_dynamic = new_dynamic_tree,
 	new_static = new_static_tree,
-	expand_bounds = expand_bounds
+	expand_bounds = expand_bounds,
+	shape_aabb = shape_aabb
 }

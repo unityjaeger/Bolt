@@ -1,0 +1,13 @@
+# bolt's specs exercise real Roblox types: CFrame, Vector3, Random and the engine's
+# vector library, so they need an engine backend rather than a bare Luau VM
+
+[suites.engine]
+include = ["tests/specs/**/*.spec.luau"]
+backend = "studio"
+
+[place]
+file = "test-place.rbxl"
+rojo = "test-place.project.json"
+
+[settings]
+timeout_ms = 60000

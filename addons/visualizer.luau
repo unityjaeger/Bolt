@@ -460,8 +460,8 @@ end
 
 --the hull is drawn exactly where the collision functions see it, which means the caller supplies the transform
 
---a mesh positions its hulls itself, so drawing one of those wants the composed
---cframe: mesh_cframe * CFrame.new(hull.offset * hull.scale)
+--a composite positions its children itself, so drawing one of those wants the composed
+--cframe: composite_cframe * child.cf
 const function draw_hull(cframe: CFrame, shape: bolt.HullShape)
 	local restore_color, old_color, restore_transparency, old_transparency, restore_thickness, old_thickness = consume_properties()
 

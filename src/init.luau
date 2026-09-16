@@ -24,7 +24,10 @@ export type CapsuleShape = types.CapsuleShape
 export type CylinderShape = types.CylinderShape
 export type WedgeShape = types.WedgeShape
 export type CornerWedgeShape = types.CornerWedgeShape
-export type MeshShape = types.MeshShape
+export type Child = types.Child
+export type Composite = types.Composite
+export type StaticComposite = types.StaticComposite
+export type DynamicComposite = types.DynamicComposite
 export type Hull = types.Hull
 export type HullShape = types.HullShape
 export type Support<T = Shape> = types.Support<T>
@@ -34,28 +37,28 @@ export type DynamicTree = types.DynamicTree
 export type StaticTree = types.StaticTree
 export type DynamicTreeConfig = types.DynamicTreeConfig
 
-local function create_box(size: Vector3): types.BoxShape
+local function create_box(size: Vector3): BoxShape
 	return {
 		type = shape_map.BOX,
 		half_extents = size / 2
 	}	
 end
 
-local function create_sphere(radius: number): types.SphereShape
+local function create_sphere(radius: number): SphereShape
 	return {
 		type = shape_map.SPHERE,
 		radius = radius
 	}
 end
 
-local function create_ellipsoid(size: Vector3): types.EllipsoidShape
+local function create_ellipsoid(size: Vector3): EllipsoidShape
 	return {
 		type = shape_map.ELLIPSOID,
 		half_extents = size / 2
 	}
 end
 
-local function create_capsule(radius: number, height: number): types.CapsuleShape
+local function create_capsule(radius: number, height: number): CapsuleShape
 	return {
 		type = shape_map.CAPSULE,
 		radius = radius,
@@ -63,7 +66,7 @@ local function create_capsule(radius: number, height: number): types.CapsuleShap
 	}
 end
 
-local function create_cylinder(radius: number, height: number): types.CylinderShape
+local function create_cylinder(radius: number, height: number): CylinderShape
 	return {
 		type = shape_map.CYLINDER,
 		radius = radius,
@@ -71,7 +74,7 @@ local function create_cylinder(radius: number, height: number): types.CylinderSh
 	}
 end
 
-local function create_wedge(size: Vector3): types.WedgeShape
+local function create_wedge(size: Vector3): WedgeShape
 	local half_extents = size / 2	
 
 	local hx, hy, hz = half_extents.X, half_extents.Y, half_extents.Z
@@ -93,7 +96,7 @@ local function create_wedge(size: Vector3): types.WedgeShape
 	}
 end
 
-local function create_corner_wedge(size: Vector3): types.CornerWedgeShape
+local function create_corner_wedge(size: Vector3): CornerWedgeShape
 	local half_extents = size / 2	
 
 	local hx, hy, hz = half_extents.X, half_extents.Y, half_extents.Z
@@ -120,40 +123,75 @@ local function create_corner_wedge(size: Vector3): types.CornerWedgeShape
 	}
 end
 
-local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vector3): types.MeshShape
-	local hull_shapes = {}
+--a composite whose children never move
 
-	local scale = size / mesh_info.size
-	local original_half_extents = mesh_info.size / 2
-
-	for i, v in mesh_info.hulls do
-		hull_shapes[i] = {
-			type = shape_map.HULL,
-			vertices = v.vertices,
-			offset = v.offset,
-			adjacency = v.adjacency,
-			scale = scale,
-			original_half_extents = original_half_extents
-		}
-	end
-
+--its tree is built once with the static tree's binned SAH, which is the better tree
+local function create_static_composite(children: {Child}): StaticComposite
 	local local_tree = aabb_tree.new_static()
-	for i, hull in hull_shapes do
-		local_tree:insert(i, CFrame.new(hull.offset * scale), hull)
+	for i, child in children do
+		local_tree:insert(i, child.cf, child.shape)
 	end
 	local_tree:full_rebuild()
 
 	return {
-		type = shape_map.MESH,
-		hulls = hull_shapes,
+		type = shape_map.COMPOSITE,
+		children = children,
 		local_tree = local_tree,
-		tree_margin = 0,
-		half_extents = size / 2,
-		original_half_extents = mesh_info.size / 2
+		tree_margin = 0
 	}
 end
 
-local function create_hull(hull_info: {vertices: {Vector3}, adjacency: {{number}}, size: Vector3}, size: Vector3): types.HullShape
+--a composite whose children move, an animated rig being the obvious one
+
+--its tree is dynamic so a child can be moved without rebuilding, and set_child is the only thing that may move one
+local function create_dynamic_composite(children: {Child}, config: DynamicTreeConfig?): DynamicComposite
+	local local_tree = aabb_tree.new_dynamic(config or {aabb_padding = 0})
+	for i, child in children do
+		local_tree:insert(i, child.cf, child.shape)
+	end
+
+	return {
+		type = shape_map.COMPOSITE,
+		children = children,
+		local_tree = local_tree,
+		tree_margin = 0,
+		dirty = false
+	}
+end
+
+--moves one child inside its composite, the composite is marked so anything cached off its overall size knows to look again
+local function set_child(composite: DynamicComposite, index: number, cf: CFrame)
+	local child = composite.children[index]
+	child.cf = cf
+
+	composite.local_tree:move(index, cf)
+	composite.dirty = true
+end
+
+--convex decomposition data describes a static composite: one hull per child, each at a fixed offset
+local function create_mesh(mesh_info: {hulls: {Hull}, size: Vector3}, size: Vector3): StaticComposite
+	local scale = size / mesh_info.size
+	local original_half_extents = mesh_info.size / 2
+
+	local children = table.create(#mesh_info.hulls) :: {Child}
+	for i, v in mesh_info.hulls do
+		children[i] = {
+			cf = CFrame.new(v.offset * scale),
+			shape = {
+				type = shape_map.HULL,
+				vertices = v.vertices,
+				offset = v.offset,
+				adjacency = v.adjacency,
+				scale = scale,
+				original_half_extents = original_half_extents
+			}
+		}
+	end
+
+	return create_static_composite(children)
+end
+
+local function create_hull(hull_info: {vertices: {Vector3}, adjacency: {{number}}, size: Vector3}, size: Vector3): HullShape
 	return {
 		type = shape_map.HULL,
 		vertices = hull_info.vertices,
@@ -167,38 +205,113 @@ local function create_hull(hull_info: {vertices: {Vector3}, adjacency: {{number}
 	}
 end
 
-local function resize_hull(hull: types.HullShape, size: Vector3)
+local function resize_hull(hull: HullShape, size: Vector3)
 	--a hull has no local tree or cached extents to rebuild, its bounds come from the scaled
 	--vertices, so the scale is the only thing a resize has to touch
 	hull.scale = (size / 2) / hull.original_half_extents
 end
 
-local function resize_mesh(mesh: MeshShape, size: Vector3)
-	local hulls = mesh.hulls
-	local local_tree = mesh.local_tree
+--the radius of the smallest sphere about a shape's origin that still contains it, whatever its orientation
 
-	local new_half_extents = size / 2
-	local scale = new_half_extents / mesh.original_half_extents
+--an AABB grows and shrinks as a shape turns, this does not, which is what a bound has
+--to be built from when it must hold across rotations rather than at one of them
 
-	for _, hull in hulls do
-		hull.scale = scale
+--this is exact for spheres, capsules, cylinders, boxes, ellipsoids, hulls and composites
+
+--wedges are bounded by the box their half extents describe and take that box's diagonal, which is conservative
+local function circumradius(shape: Shape): number
+	local shape_type = shape.type
+	local base
+
+	if shape_type == shape_map.SPHERE then
+		base = (shape :: SphereShape).radius
+	elseif shape_type == shape_map.CAPSULE then
+		local capsule = shape :: CapsuleShape
+		base = capsule.half_height + capsule.radius
+	elseif shape_type == shape_map.CYLINDER then
+		local cylinder = shape :: CylinderShape
+		base = math.sqrt(cylinder.half_height * cylinder.half_height + cylinder.radius * cylinder.radius)
+	elseif shape_type == shape_map.COMPOSITE then
+		--measured from the composite's own tree, so it follows its children
+		local composite = shape :: Composite
+		local tree = composite.local_tree
+		local root = tree.root
+
+		if root == 0 then
+			base = 0
+		else
+			local applied = vector.one * composite.tree_margin
+			local local_min = tree.aabb_min[root] + applied
+			local local_max = tree.aabb_max[root] - applied
+
+			--the furthest corner from the composite's origin, which is what it spins about
+			local furthest = vector.max(vector.abs(local_min), vector.abs(local_max))
+			base = vector.magnitude(furthest)
+		end
+	elseif shape_type == shape_map.ELLIPSOID then
+		--an ellipsoid reaches furthest along its longest axis, the box diagonal would overshoot it
+		local half_extents = (shape :: EllipsoidShape).half_extents
+		base = math.max(half_extents.X, half_extents.Y, half_extents.Z)
+	elseif shape_type == shape_map.HULL then
+		--the vertices are measured rather than the declared size, so this agrees with the bounds an
+		--aabb tree computes for the same hull
+		local hull = shape :: HullShape
+		local vertices = hull.vertices
+		local scale = hull.scale
+
+		local furthest_sq = 0
+		for i = 1, #vertices do
+			local scaled = vertices[i] * scale
+			local distance_sq = vector.dot(scaled :: any, scaled :: any)
+			if distance_sq > furthest_sq then
+				furthest_sq = distance_sq
+			end
+		end
+
+		base = math.sqrt(furthest_sq)
+	else
+		--box, wedge and corner wedge are all bounded by their half extents
+		base = vector.magnitude((shape :: BoxShape).half_extents :: any)
 	end
 
-	mesh.half_extents = size / 2
+	--a margin inflates the shape in every direction, so it adds to the radius directly,
+	--negatives are ignored here exactly as gjk and mpr ignore them
+	return base + math.max(0, shape.margin or 0)
+end
+
+--rescales every hull of a composite built from mesh data, and rebuilds the tree around the new
+--offsets, only meaningful for composites create_mesh produced, since it assumes hull children
+local function resize_mesh(mesh: StaticComposite, size: Vector3)
+	local children = mesh.children
+	local local_tree = mesh.local_tree
+
+	local first = children[1]
+	if first == nil then
+		return
+	end
+
+	local hull = first.shape :: HullShape
+	local scale = (size / 2) / hull.original_half_extents
+
+	for _, child in children do
+		local child_hull = child.shape :: HullShape
+		child_hull.scale = scale
+		child.cf = CFrame.new(child_hull.offset * scale)
+	end
 
 	local_tree:clear()
-	for i, hull in hulls do
-		local_tree:insert(i, CFrame.new(hull.offset * scale), hull)
+	for i, child in children do
+		local_tree:insert(i, child.cf, child.shape)
 	end
 	local_tree:full_rebuild()
 
-	--the hulls carry whatever margin they were last synced to, so the rebuilt bounds already
+	--the children carry whatever margin they were last synced to, so the rebuilt bounds already
 	--account for exactly that much and nothing further needs widening
-	local hull_margin = hulls[1] and hulls[1].margin or 0
-	mesh.tree_margin = math.max(hull_margin, 0)
+	local child_margin = hull.margin or 0
+	mesh.tree_margin = math.max(child_margin, 0)
 end
 
-local function create_from_part(part: Part): types.Shape
+local function create_from_part(part: Part): Shape
 	if part:IsA("MeshPart") or part:IsA("UnionOperation") then
 		error("meshes and unions cannot be created from parts")
 	elseif part:IsA("Part") then
@@ -239,12 +352,17 @@ return {
 	create_cylinder = create_cylinder,
 	create_wedge = create_wedge,
 	create_corner_wedge = create_corner_wedge,
+	create_static_composite = create_static_composite,
+	create_dynamic_composite = create_dynamic_composite,
+	set_child = set_child,
 	create_mesh = create_mesh,
 	create_hull = create_hull,
 	create_from_part = create_from_part,
 
 	resize_mesh = resize_mesh,
 	resize_hull = resize_hull,
+
+	circumradius = circumradius,
 
 	collision = {
 		box_box = box.box_box,
@@ -272,6 +390,8 @@ return {
 		new = aabb_tree.new_dynamic,
 		new_static = aabb_tree.new_static
 	},
+
+	shape_aabb = aabb_tree.shape_aabb,
 
 	mpr = {
 		intersects = mpr.intersects,

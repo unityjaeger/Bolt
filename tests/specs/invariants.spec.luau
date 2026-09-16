@@ -1,9 +1,14 @@
 --!strict
 
-local helpers = require(script.Parent.Parent.helpers)
+local Lest = require('@lest')
+local describe, it = Lest.describe, Lest.it
 
-return function(t: any, bolt: any)
-	t.test("invariants/rotated box contact boundary agrees across narrow phases", function()
+local bolt = require('../../src')
+local check = require('../check')
+local helpers = require('../helpers')
+
+describe('invariants', function ()
+	it('rotated box contact boundary agrees across narrow phases', function ()
 		local box_a = bolt.create_box(Vector3.new(2, 3, 4))
 		local box_b = bolt.create_box(Vector3.new(1.5, 2.5, 1))
 		local rotation_a = CFrame.fromOrientation(0.35, -0.5, 0.2)
@@ -33,22 +38,23 @@ return function(t: any, bolt: any)
 			local mpr_hit = bolt.mpr.intersects(cf_a, box_a, cf_b, box_b, 1e-6)
 			local message = `case {case.name}, offset {case.offset}`
 
-			t.equal(special_hit, case.expected, `special: {message}`)
-			t.equal(sat_hit, case.expected, `SAT: {message}`)
-			t.equal(gjk_hit, case.expected, `GJK: {message}`)
-			t.equal(mpr_hit, case.expected, `MPR: {message}`)
+			check.equal(special_hit, case.expected, `special: {message}`)
+			check.equal(sat_hit, case.expected, `SAT: {message}`)
+			check.equal(gjk_hit, case.expected, `GJK: {message}`)
+			check.equal(mpr_hit, case.expected, `MPR: {message}`)
 
 			if sat_hit then
-				helpers.assert_unit_vector(t, t.non_nil(sat_normal), 1e-3)
-				t.truthy(t.non_nil(sat_depth) >= 0)
+				helpers.assert_unit_vector(check.non_nil(sat_normal), 1e-3)
+				check.truthy(check.non_nil(sat_depth) >= 0)
 			else
-				t.is_nil(sat_normal)
-				t.is_nil(sat_depth)
+				check.is_nil(sat_normal)
+				check.is_nil(sat_depth)
 			end
 		end
 	end)
 
-	t.test("invariants/sphere collision and casts remain stable across scales", function()
+
+	it('sphere collision and casts remain stable across scales', function ()
 		for _, scale in {1e-2, 1, 1e3} do
 			local sphere = bolt.create_sphere(scale)
 			local gap = scale * 2e-2
@@ -57,17 +63,17 @@ return function(t: any, bolt: any)
 			local overlapping_cf = CFrame.new(2 * scale - gap, 0, 0)
 			local message = `scale {scale}`
 
-			t.truthy(bolt.collision.sphere_sphere(CFrame.identity, sphere, touching_cf, sphere), message)
-			t.truthy(bolt.gjk.intersects(CFrame.identity, sphere, touching_cf, sphere, 0), message)
-			t.truthy(bolt.mpr.intersects(CFrame.identity, sphere, touching_cf, sphere, 1e-6), message)
+			check.truthy(bolt.collision.sphere_sphere(CFrame.identity, sphere, touching_cf, sphere), message)
+			check.truthy(bolt.gjk.intersects(CFrame.identity, sphere, touching_cf, sphere, 0), message)
+			check.truthy(bolt.mpr.intersects(CFrame.identity, sphere, touching_cf, sphere, 1e-6), message)
 
-			t.falsy(bolt.collision.sphere_sphere(CFrame.identity, sphere, separated_cf, sphere), message)
-			t.falsy(bolt.gjk.intersects(CFrame.identity, sphere, separated_cf, sphere, 0), message)
-			t.falsy(bolt.mpr.intersects(CFrame.identity, sphere, separated_cf, sphere, 1e-6), message)
+			check.falsy(bolt.collision.sphere_sphere(CFrame.identity, sphere, separated_cf, sphere), message)
+			check.falsy(bolt.gjk.intersects(CFrame.identity, sphere, separated_cf, sphere, 0), message)
+			check.falsy(bolt.mpr.intersects(CFrame.identity, sphere, separated_cf, sphere, 1e-6), message)
 
-			t.truthy(bolt.collision.sphere_sphere(CFrame.identity, sphere, overlapping_cf, sphere), message)
-			t.truthy(bolt.gjk.intersects(CFrame.identity, sphere, overlapping_cf, sphere, 0), message)
-			t.truthy(bolt.mpr.intersects(CFrame.identity, sphere, overlapping_cf, sphere, 1e-6), message)
+			check.truthy(bolt.collision.sphere_sphere(CFrame.identity, sphere, overlapping_cf, sphere), message)
+			check.truthy(bolt.gjk.intersects(CFrame.identity, sphere, overlapping_cf, sphere, 0), message)
+			check.truthy(bolt.mpr.intersects(CFrame.identity, sphere, overlapping_cf, sphere, 1e-6), message)
 
 			local ray_origin = Vector3.new(-3 * scale, 0, 0)
 			local ray_direction = Vector3.new(4 * scale, 0, 0)
@@ -84,8 +90,8 @@ return function(t: any, bolt: any)
 				sphere,
 				0
 			)
-			t.near(t.non_nil(special_distance) / scale, 2, 1e-3, message)
-			t.near(t.non_nil(gjk_distance) / scale, 2, 1e-3, message)
+			check.near(check.non_nil(special_distance) / scale, 2, 1e-3, message)
+			check.near(check.non_nil(gjk_distance) / scale, 2, 1e-3, message)
 
 			local cast_start = CFrame.new(-3 * scale, 0, 0)
 			local cast_direction = Vector3.new(4 * scale, 0, 0)
@@ -105,11 +111,14 @@ return function(t: any, bolt: any)
 				sphere,
 				0
 			)
-			t.truthy(simple_hit, message)
-			t.non_nil(point, message)
-			t.near(t.non_nil(simple_distance) / scale, 1, 1e-3, message)
-			t.near(t.non_nil(distance) / scale, 1, 1e-3, message)
-			helpers.assert_unit_vector(t, t.non_nil(normal), 1e-3)
+			check.truthy(simple_hit, message)
+			check.non_nil(point, message)
+			check.near(check.non_nil(simple_distance) / scale, 1, 1e-3, message)
+			check.near(check.non_nil(distance) / scale, 1, 1e-3, message)
+			helpers.assert_unit_vector(check.non_nil(normal), 1e-3)
 		end
 	end)
-end
+
+end)
+
+return nil

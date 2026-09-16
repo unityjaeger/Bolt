@@ -33,10 +33,10 @@ visualizer.components.hull(cframe: CFrame, shape: bolt.HullShape)
 
 The hull component draws one line per entry in the hull's `adjacency` graph, so what you see is the adjacency you supplied rather than a computed silhouette. A hull built with a fully connected graph therefore draws every vertex pair, which looks like a solid web instead of an outline. That is worth knowing when a hull renders far denser than expected: the drawing is correct, the adjacency is just denser than the real edges.
 
-A mesh positions its hulls itself, so drawing one of a mesh's hulls needs the composed transform:
+A mesh is a composite that positions its children itself, so drawing one of its hulls needs the composed transform:
 ```luau
-for _, hull in mesh.hulls do
-    visualizer.components.hull(mesh_cframe * CFrame.new(hull.offset * hull.scale), hull)
+for _, child in mesh.children do
+    visualizer.components.hull(mesh_cframe * child.cf, child.shape)
 end
 ```
 A hull created with `bolt.create_hull` has no offset, so it is drawn with its own `CFrame` directly.

@@ -1,54 +1,59 @@
 --!strict
 
-local helpers = require(script.Parent.Parent.helpers)
+local Lest = require('@lest')
+local describe, it = Lest.describe, Lest.it
 
-local SEED = 10000
+local bolt = require('../../src')
+local check = require('../check')
+local helpers = require('../helpers')
 
-return function(t: any, bolt: any)
-	local box = bolt.create_box(Vector3.new(2, 1.5, 2.5))
-	local sphere = bolt.create_sphere(0.9)
-	local capsule = bolt.create_capsule(0.6, 2.2)
+local box = bolt.create_box(Vector3.new(2, 1.5, 2.5))
+local sphere = bolt.create_sphere(0.9)
+local capsule = bolt.create_capsule(0.6, 2.2)
 
-	local primitive_pairs = {
-		{
-			name = "box_box",
-			shape_a = box,
-			shape_b = box,
-			special = bolt.collision.box_box,
-		},
-		{
-			name = "box_sphere",
-			shape_a = box,
-			shape_b = sphere,
-			special = bolt.collision.box_sphere,
-		},
-		{
-			name = "box_capsule",
-			shape_a = box,
-			shape_b = capsule,
-			special = bolt.collision.box_capsule,
-		},
-		{
-			name = "sphere_sphere",
-			shape_a = sphere,
-			shape_b = sphere,
-			special = bolt.collision.sphere_sphere,
-		},
-		{
-			name = "sphere_capsule",
-			shape_a = sphere,
-			shape_b = capsule,
-			special = bolt.collision.sphere_capsule,
-		},
-		{
-			name = "capsule_capsule",
-			shape_a = capsule,
-			shape_b = capsule,
-			special = bolt.collision.capsule_capsule,
-		},
-	}
+local SEED = 100
 
-	t.test("differential/random special collisions agree with GJK", function()
+local primitive_pairs = {
+	{
+		name = "box_box",
+		shape_a = box,
+		shape_b = box,
+		special = bolt.collision.box_box,
+	},
+	{
+		name = "box_sphere",
+		shape_a = box,
+		shape_b = sphere,
+		special = bolt.collision.box_sphere,
+	},
+	{
+		name = "box_capsule",
+		shape_a = box,
+		shape_b = capsule,
+		special = bolt.collision.box_capsule,
+	},
+	{
+		name = "sphere_sphere",
+		shape_a = sphere,
+		shape_b = sphere,
+		special = bolt.collision.sphere_sphere,
+	},
+	{
+		name = "sphere_capsule",
+		shape_a = sphere,
+		shape_b = capsule,
+		special = bolt.collision.sphere_capsule,
+	},
+	{
+		name = "capsule_capsule",
+		shape_a = capsule,
+		shape_b = capsule,
+		special = bolt.collision.capsule_capsule,
+	},
+}
+
+describe('differential', function ()
+	it('random special collisions agree with GJK', function ()
 		local random = Random.new(SEED)
 
 		for _, pair in primitive_pairs do
@@ -57,7 +62,7 @@ return function(t: any, bolt: any)
 				local cf_b = helpers.random_cframe(random, 2.5)
 				local expected = pair.special(cf_a, pair.shape_a, cf_b, pair.shape_b)
 				local actual = bolt.gjk.intersects(cf_a, pair.shape_a, cf_b, pair.shape_b, 0)
-				t.equal(
+				check.equal(
 					actual,
 					expected,
 					`seed {SEED}, pair {pair.name}, iteration {iteration}, A {cf_a}, B {cf_b}`
@@ -66,7 +71,8 @@ return function(t: any, bolt: any)
 		end
 	end)
 
-	t.test("differential/random box SAT agrees with special collision", function()
+
+	it('random box SAT agrees with special collision', function ()
 		local random = Random.new(SEED + 1)
 
 		for iteration = 1, 250 do
@@ -74,7 +80,7 @@ return function(t: any, bolt: any)
 			local cf_b = helpers.random_cframe(random, 2.5)
 			local expected = bolt.collision.box_box(cf_a, box, cf_b, box)
 			local actual = bolt.sat.box_box(cf_a, box, cf_b, box)
-			t.equal(
+			check.equal(
 				actual,
 				expected,
 				`seed {SEED + 1}, iteration {iteration}, A {cf_a}, B {cf_b}`
@@ -82,7 +88,8 @@ return function(t: any, bolt: any)
 		end
 	end)
 
-	t.test("differential/random SAT pairs agree with reference queries", function()
+
+	it('random SAT pairs agree with reference queries', function ()
 		local random = Random.new(SEED + 5)
 		local sat_box = bolt.create_box(Vector3.new(2, 1.5, 2.5))
 		local wedge = bolt.create_wedge(Vector3.new(2, 1.5, 2.5))
@@ -130,7 +137,7 @@ return function(t: any, bolt: any)
 					local reference_hit = if pair.reference ~= nil
 						then pair.reference(cf_a, pair.a, cf_b, pair.b)
 						else bolt.mpr.intersects(cf_a, pair.a, cf_b, pair.b, 0)
-					t.equal(
+					check.equal(
 						actual,
 						reference_hit,
 						`seed {SEED + 5}, pair {pair.name}, iteration {iteration}, GJK {gjk_hit}, A {cf_a}, B {cf_b}`
@@ -140,7 +147,8 @@ return function(t: any, bolt: any)
 		end
 	end)
 
-	t.test("differential/random MPR agrees with analytic sphere collision", function()
+
+	it('random MPR agrees with analytic sphere collision', function ()
 		local random = Random.new(SEED + 2)
 
 		for iteration = 1, 100 do
@@ -156,7 +164,7 @@ return function(t: any, bolt: any)
 			)
 			local expected = bolt.collision.sphere_sphere(cf_a, sphere, cf_b, sphere)
 			local actual = bolt.mpr.intersects(cf_a, sphere, cf_b, sphere, 1e-6)
-			t.equal(
+			check.equal(
 				actual,
 				expected,
 				`seed {SEED + 2}, iteration {iteration}, A {cf_a.Position}, B {cf_b.Position}`
@@ -164,7 +172,8 @@ return function(t: any, bolt: any)
 		end
 	end)
 
-	t.test("differential/random full and simple shapecasts agree", function()
+
+	it('random full and simple shapecasts agree', function ()
 		local random = Random.new(SEED + 3)
 		local shapes = {box, sphere, capsule}
 
@@ -197,29 +206,30 @@ return function(t: any, bolt: any)
 			)
 			local full_hit = point ~= nil
 
-			t.equal(
+			check.equal(
 				full_hit,
 				simple_hit,
 				`seed {SEED + 3}, iteration {iteration}, A {cf_a}, B {cf_b}, direction {direction}`
 			)
 
 			if simple_hit then
-				t.near(
-					t.non_nil(distance),
-					t.non_nil(simple_distance),
+				check.near(
+					check.non_nil(distance),
+					check.non_nil(simple_distance),
 					1e-4,
 					`seed {SEED + 3}, iteration {iteration}`
 				)
-				t.vector_finite(t.non_nil(point))
-				t.vector_finite(t.non_nil(normal))
+				check.vector_finite(check.non_nil(point))
+				check.vector_finite(check.non_nil(normal))
 			else
-				t.is_nil(distance)
-				t.is_nil(normal)
+				check.is_nil(distance)
+				check.is_nil(normal)
 			end
 		end
 	end)
 
-	t.test("differential/random special rays agree with GJK", function()
+
+	it('random special rays agree with GJK', function ()
 		local random = Random.new(SEED + 6)
 		local ray_shapes = {
 			{name = "box", shape = box, cast = bolt.raycast.box},
@@ -248,18 +258,19 @@ return function(t: any, bolt: any)
 				local message =
 					`seed {SEED + 6}, shape {entry.name}, iteration {iteration}, cf {cf}, origin {origin}, direction {direction}`
 
-				t.equal(gjk_hit, special_hit, message)
+				check.equal(gjk_hit, special_hit, message)
 				if special_hit then
-					t.near(t.non_nil(gjk_distance), t.non_nil(special_distance), 1e-4, message)
+					check.near(check.non_nil(gjk_distance), check.non_nil(special_distance), 1e-4, message)
 				else
-					t.is_nil(gjk_distance, message)
-					t.is_nil(special_distance, message)
+					check.is_nil(gjk_distance, message)
+					check.is_nil(special_distance, message)
 				end
 			end
 		end
 	end)
 
-	t.test("differential/random broad phase has no false negatives", function()
+
+	it('random broad phase has no false negatives', function ()
 		local random = Random.new(SEED + 4)
 		local target_shapes = {
 			bolt.create_box(Vector3.new(2, 3, 1.5)),
@@ -300,7 +311,7 @@ return function(t: any, bolt: any)
 
 			for id, record in records do
 				if bolt.gjk.intersects(query_cf, query_shape, record.cf, record.shape, 0) then
-					t.contains(
+					check.contains(
 						shape_candidates,
 						id,
 						`shape query false negative: seed {SEED + 4}, iteration {iteration}, id {id}`
@@ -315,7 +326,7 @@ return function(t: any, bolt: any)
 					0
 				)
 				if ray_point ~= nil then
-					t.contains(
+					check.contains(
 						ray_candidates,
 						id,
 						`ray query false negative: seed {SEED + 4}, iteration {iteration}, id {id}`
@@ -331,7 +342,7 @@ return function(t: any, bolt: any)
 					0
 				)
 				if cast_hit then
-					t.contains(
+					check.contains(
 						cast_candidates,
 						id,
 						`shapecast query false negative: seed {SEED + 4}, iteration {iteration}, id {id}`
@@ -340,4 +351,6 @@ return function(t: any, bolt: any)
 			end
 		end
 	end)
-end
+end)
+
+return nil
