@@ -1,0 +1,9 @@
+{
+	"name": "BoltMesh",
+	"tree": {
+		"$className": "Folder",
+		"Main": { "$path": "main.server.luau" },
+		"Modules": { "$path": "Modules" },
+		"Dependencies": { "$path": "Packages" }
+	}
+}

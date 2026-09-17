@@ -1,0 +1,11 @@
+{
+	"name": "boltmesh-test-place",
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"$className": "ReplicatedStorage",
+			"bolt": { "$path": "../src" },
+			"BoltMesh": { "$path": "Modules" }
+		}
+	}
+}

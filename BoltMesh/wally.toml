@@ -1,0 +1,11 @@
+[package]
+name = "unityjaeger/boltmesh"
+description = "Studio plugin that exports MeshPart and union collision hulls for bolt"
+version = "1.0.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+license = "MIT"
+private = true
+
+[dependencies]
+Iris = "sirmallard/iris@2.5.1"

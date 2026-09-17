@@ -1,0 +1,10 @@
+[suites.engine]
+include = ["tests/specs/**/*.spec.luau"]
+backend = "studio"
+
+[place]
+file = "test-place.rbxl"
+rojo = "test-place.project.json"
+
+[settings]
+timeout_ms = 120000
