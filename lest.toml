@@ -2,7 +2,7 @@
 # vector library, so they need an engine backend rather than a bare Luau VM
 
 [suites.engine]
-include = ["tests/specs/**/*.spec.luau"]
+include = ["tests/specs/**/*.spec.luau", "BoltMesh/tests/specs/**/*.spec.luau"]
 backend = "studio"
 
 [place]

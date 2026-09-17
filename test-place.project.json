@@ -6,6 +6,9 @@
             "$className": "ReplicatedStorage",
             "bolt": {
                 "$path": "src"
+            },
+            "BoltMesh": {
+                "$path": "BoltMesh/Modules"
             }
         }
     }

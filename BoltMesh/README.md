@@ -42,9 +42,12 @@ Put `BoltMesh.rbxm` in your Studio plugins folder.
 
 ## Tests
 
-The specs run in Studio through [Lest](https://github.com/lest-luau/lest)
+The specs run in Studio through [Lest](https://github.com/lest-luau/lest) as part
+of the Bolt repo's suite, in the same Studio launch as the library's own specs.
+From the repo root:
 
 ```console
 rojo build test-place.project.json -o test-place.rbxl
-lest
+lest                    # everything
+lest -t 'collision'     # only these specs
 ```

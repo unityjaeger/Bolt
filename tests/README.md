@@ -13,8 +13,9 @@ rojo build test-place.project.json -o test-place.rbxl
 Then:
 
 ```console
-lest                      # the whole suite
+lest                      # the whole suite, the hull plugin's specs included
 lest -t 'margin'          # only tests whose full name contains "margin"
+lest -t 'collision'       # the hull plugin's specs (BoltMesh/tests/specs)
 ```
 
 `lest.toml` points the studio backend at `test-place.rbxl` and maps `src` into
