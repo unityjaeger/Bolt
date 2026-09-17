@@ -117,44 +117,45 @@ local function draw_preview(part: BasePart, extraction: Extraction)
 		local seen: { [number]: boolean } = {}
 
 		local triangles = hull.triangles
+		local vertices = hull.vertices
 		for triangle = 0, #triangles // 3 - 1 do
 			local a, b, c = triangles[triangle * 3 + 1], triangles[triangle * 3 + 2], triangles[triangle * 3 + 3]
 
 			--a -> b
-			if a > b then
-				a, b = b, a
+			local lo, hi = a, b
+			if lo > hi then
+				lo, hi = hi, lo
 			end
-			local key = a * MAX_EDGE_KEY + b
-			if seen[key] then
-				return
+			local key = lo * MAX_EDGE_KEY + hi
+			if not seen[key] then
+				seen[key] = true
+				table.insert(points, cframe * (origin + vertices[lo] * scale))
+				table.insert(points, cframe * (origin + vertices[hi] * scale))
 			end
-			seen[key] = true
-			table.insert(points, cframe * (origin + hull.vertices[a] * scale))
-			table.insert(points, cframe * (origin + hull.vertices[b] * scale))
 
 			--b -> c
-			if b > c then
-				b, c = c, b
+			lo, hi = b, c
+			if lo > hi then
+				lo, hi = hi, lo
 			end
-			key = b * MAX_EDGE_KEY + c
-			if seen[key] then
-				return
+			key = lo * MAX_EDGE_KEY + hi
+			if not seen[key] then
+				seen[key] = true
+				table.insert(points, cframe * (origin + vertices[lo] * scale))
+				table.insert(points, cframe * (origin + vertices[hi] * scale))
 			end
-			seen[key] = true
-			table.insert(points, cframe * (origin + hull.vertices[b] * scale))
-			table.insert(points, cframe * (origin + hull.vertices[c] * scale))
 
 			--c -> a
-			if c > a then
-				c, a = a, c
+			lo, hi = c, a
+			if lo > hi then
+				lo, hi = hi, lo
 			end
-			key = c * MAX_EDGE_KEY + a
-			if seen[key] then
-				return
+			key = lo * MAX_EDGE_KEY + hi
+			if not seen[key] then
+				seen[key] = true
+				table.insert(points, cframe * (origin + vertices[lo] * scale))
+				table.insert(points, cframe * (origin + vertices[hi] * scale))
 			end
-			seen[key] = true
-			table.insert(points, cframe * (origin + hull.vertices[c] * scale))
-			table.insert(points, cframe * (origin + hull.vertices[a] * scale))
 		end
 
 		adornment:AddLines(points)
