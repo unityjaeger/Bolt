@@ -152,9 +152,10 @@ const function convert_hull(hull: csgphs.CollisionHull): Hull?
 end
 
 -- the collision blob a part carries in its serialization, nil when it holds none,
--- the vertices are at the MeshSize for a MeshPart, the Size otherwise
+-- the vertices are at the MeshSize, which a union has too, its blob stays at the size
+-- it was built at through resizes
 const function serialized_geometry(part: BasePart): (csgphs.CollisionGeometry?, Vector3)
-	local reference_size = if part:IsA("MeshPart") then part.MeshSize else part.Size
+	local reference_size: Vector3 = (part :: any).MeshSize
 	local model = rbxm.read_model(SerializationService:SerializeInstancesAsync({ part }), decompress_zstd)
 
 	for _, class in model.classes do

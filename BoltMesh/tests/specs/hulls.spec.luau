@@ -481,6 +481,24 @@ describe("collision extraction", function()
 		expect(probe_hits(cframe, mesh, Vector3.new(1.5, 2, 1.5))).toBe(false)
 	end)
 
+	it("reads a stretched union at the size it was built at", function()
+		local union = create_union()
+		local cframe = CFrame.new(-3, 4, 1) * CFrame.Angles(0.5, -0.2, 0.3)
+		union.CFrame = cframe
+		union.Size = union.Size * 2
+
+		local extraction = collision_geometry.extract(union)
+		local mesh_size, size = union.MeshSize, union.Size
+		local expected_min, expected_max = block_bounds(union.ExtentsCFrame, union.ExtentsSize)
+		union:Destroy()
+
+		-- the blob stays at the built size, create_mesh scales it to the part's
+		expect_near(extraction.data.size, mesh_size, 1e-5)
+		expect_near(size, mesh_size * 2, 1e-3)
+		local mesh = bolt.create_mesh(CollisionParser.unpack(CollisionParser.pack(extraction.data)), size)
+		expect_bounds(cframe, mesh, expected_min, expected_max, 0.05)
+	end)
+
 	it("rejects an Instance that is not a MeshPart or Union", function()
 		local part = Instance.new("Part")
 		expect(function()
