@@ -4,12 +4,11 @@ A Roblox Studio plugin that exports the convex hulls the engine collides a `Mesh
 
 ## How it works
 
-The engine has no API that hands out collision geometry, but it serializes it.
-`GeometryService:UnionAsync(part, {})` makes a fresh copy whose physics data is
-local (a cloud MeshPart's is an asset reference, and an older union is rewritten
-in the current format), `SerializationService:SerializeInstancesAsync`
-writes that copy as a binary model, and the copy's `PhysicalConfigData` shared
-string is a CSGPHS blob holding the hulls.
+The engine has no API that hands out collision geometry, but it serializes it:
+a part's `PhysicalConfigData` shared string in the output of
+`SerializationService:SerializeInstancesAsync` is a CSGPHS blob holding the
+hulls, exactly what the engine collides the part with. This blob always seems to
+be a version 8 blob, even on very old assets, which is the only supported reader format.
 
 An export appears under `ReplicatedStorage.Collisions.Hulls.<PartName>` as a
 Folder of Base64 StringValue chunks (at most 100,000 characters each) holding

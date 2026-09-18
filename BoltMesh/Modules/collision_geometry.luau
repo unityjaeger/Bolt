@@ -1,14 +1,15 @@
 --!strict
 
+-- a part's collision data is the PhysicalConfigData shared string in its serialization, a CSGPHS blob
+
+-- i could not find any example of a mesh or union that doesn't work with the newest CSGPHS version, so the UnionAsync coercion way of doing things
+-- was removed, as it caused differences in collision data from roblox because CSG uses different convex decomposition algorithms for some fidelities
+
 const rbxm = require("./rbxm")
 const csgphs = require("./csgphs")
 
-const GeometryService = game:GetService("GeometryService")
 const SerializationService = game:GetService("SerializationService")
 const EncodingService = game:GetService("EncodingService")
-const ContentProvider = game:GetService("ContentProvider")
-
-const COPY_NAME = "bolt_collision_copy"
 
 export type Hull = {
 	-- the hull's centre in the part's object space, at the reference size
@@ -150,92 +151,36 @@ const function convert_hull(hull: csgphs.CollisionHull): Hull?
 	}
 end
 
-const function extract_geometry(part: BasePart, fidelity: Enum.CollisionFidelity): (csgphs.CollisionGeometry, Vector3)
-	local copy: BasePart? = nil
-	local function union()
-		local results = GeometryService:UnionAsync(part, {}, {
-			CollisionFidelity = fidelity,
-			SplitApart = false,
-		})
-		local result = results[1] :: BasePart
-		assert(typeof(result) == "Instance" and result:IsA("BasePart"), "UnionAsync returned no part")
-		result.Name = COPY_NAME
-		copy = result
-	end
-	
-	local ok, err = pcall(union)
-	if not ok then
-		pcall(function()
-			ContentProvider:PreloadAsync({ part })
-		end)
-		ok, err = pcall(union)
-	end
+-- the collision blob a part carries in its serialization, nil when it holds none,
+-- the vertices are at the MeshSize for a MeshPart, the Size otherwise
+const function serialized_geometry(part: BasePart): (csgphs.CollisionGeometry?, Vector3)
+	local reference_size = if part:IsA("MeshPart") then part.MeshSize else part.Size
+	local model = rbxm.read_model(SerializationService:SerializeInstancesAsync({ part }), decompress_zstd)
 
-	if not ok then
-		error(`{part:GetFullName()}: {tostring(err)}`, 0)
-	end
-
-	local copy_part = copy :: BasePart
-
-	local read_ok, result, reference_size = pcall(function(): (csgphs.CollisionGeometry, Vector3)
-		local offset = part.CFrame:ToObjectSpace(copy_part.CFrame)
-		local size = part.Size
-		local tolerance = 1e-3 * math.max(1, size.X, size.Y, size.Z)
-		assert(
-			offset.Position.Magnitude <= tolerance
-			and (offset.RightVector - Vector3.xAxis).Magnitude <= 1e-3
-			and (offset.UpVector - Vector3.yAxis).Magnitude <= 1e-3,
-			"UnionAsync moved the part's geometry relative to its CFrame, collision extraction does not handle that"
-		)
-		-- the size the hull vertices are expressed at: the copy carries the part's size as its own MeshSize
-		local reference_size = if copy_part:IsA("MeshPart") then copy_part.MeshSize else copy_part.Size
-
-		local model = rbxm.read_model(SerializationService:SerializeInstancesAsync({ copy_part }), decompress_zstd)
-		local blob: buffer? = nil
-		for _, class in model.classes do
-			local names = class.strings.Name
-			local indices = class.shared_string_indices.PhysicalConfigData
-			if names == nil or indices == nil then
-				continue
-			end
-			for position, name in names do
-				local shared_string = model.shared_strings[indices[position]]
-				if name == COPY_NAME and shared_string ~= nil and csgphs.is_collision_blob(shared_string) then
-					blob = shared_string
-				end
-			end
+	for _, class in model.classes do
+		local indices = class.shared_string_indices.PhysicalConfigData
+		if indices == nil then
+			continue
 		end
 
-		assert(blob ~= nil, "the serialized part carries no collision geometry")
-		return csgphs.parse(blob :: buffer, decompress_zstd), reference_size
-	end)
-
-	copy_part:Destroy()
-	if not read_ok then
-		error(result, 0)
+		for _, index in indices do
+			local shared_string = model.shared_strings[index]
+			if shared_string ~= nil and csgphs.is_collision_blob(shared_string) then
+				return csgphs.parse(shared_string, decompress_zstd), reference_size
+			end
+		end
 	end
 
-	return result :: csgphs.CollisionGeometry, reference_size :: Vector3
+	return nil, reference_size
 end
 
-const function extract(part: BasePart, collision_fidelity: Enum.CollisionFidelity?): Extraction
-	assert(is_supported(part), "collision extraction takes MeshParts and unions")
-	local fidelity: Enum.CollisionFidelity = collision_fidelity or (part :: any).CollisionFidelity
-
-	if fidelity == Enum.CollisionFidelity.Box then
-		return {
-			data = { size = part.Size, hulls = { box_hull(part) } },
-			fidelity = fidelity,
-			skipped_hulls = 0,
-		}
-	end
-
-	local geometry, reference_size = extract_geometry(part, fidelity)
+-- a "block" geometry is the engine writing the part off as its bounding box, which the extents
+-- already describe, anything else is converted hull by hull
+const function hulls_of(part: BasePart, geometry: csgphs.CollisionGeometry): ({ Hull }, number)
 	local hulls: { Hull } = {}
 	local skipped_hulls = 0
+
 	if geometry.kind == "block" then
-		-- the engine wrote the part off as its bounding box, which the
-		-- extents already describe
 		table.insert(hulls, box_hull(part))
 	else
 		for _, hull in geometry.hulls do
@@ -248,6 +193,25 @@ const function extract(part: BasePart, collision_fidelity: Enum.CollisionFidelit
 		end
 	end
 
+	return hulls, skipped_hulls
+end
+
+-- the part's collision geometry read straight out of its serialization
+const function extract(part: BasePart): Extraction
+	assert(is_supported(part), "collision extraction takes MeshParts and unions")
+	local fidelity: Enum.CollisionFidelity = (part :: any).CollisionFidelity
+
+	if fidelity == Enum.CollisionFidelity.Box then
+		return {
+			data = { size = part.Size, hulls = { box_hull(part) } },
+			fidelity = fidelity,
+			skipped_hulls = 0,
+		}
+	end
+
+	local geometry, reference_size = serialized_geometry(part)
+	assert(geometry ~= nil, `{part:GetFullName()}: the serialized part carries no collision geometry`)
+	local hulls, skipped_hulls = hulls_of(part, geometry :: csgphs.CollisionGeometry)
 	assert(#hulls > 0, `{part:GetFullName()}: the collision geometry holds no usable hull`)
 
 	return {

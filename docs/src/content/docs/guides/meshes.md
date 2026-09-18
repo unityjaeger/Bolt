@@ -7,7 +7,7 @@ MPR and GJK only work with convex shapes, so arbitrary meshes need to be decompo
 
 Meshes are supported through this [Plugin](https://create.roblox.com/store/asset/114210433179837/Collision-Hulls)
 
-The plugin lets you select a `MeshPart` or union and export the convex hulls the engine itself collides it with, at the part's own `CollisionFidelity`. The hulls are read out of the engine's serialized collision data, so they match what the physics engine simulates against.
+The plugin lets you select a `MeshPart` or union and export the convex hulls the engine itself collides it with, at the part's own `CollisionFidelity`. The hulls are read out of the part's own serialized collision data, so they match what the physics engine simulates against.
 
 Before exporting, the plugin can draw the hulls over the selected part. They follow the part through `CFrame` and `Size` changes.
 
